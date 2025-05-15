@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loja Manager Simulator MAX</title>
+    <style>
+        /* === RESET BÁSICO E ESTILOS GLOBAIS === */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #e9ebee;
+            color: #333;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 5px;
+        }
+
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 1000px;
+            height: calc(100vh - 10px);
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #4a69bb;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            border-bottom: 3px solid #3b5998;
+            flex-shrink: 0;
+        }
+        header h1 {
+            font-size: 1.6em;
+            margin: 0;
+        }
+
+        /* === PAINEL DE STATUS SUPERIOR === */
+        #status-bar {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 8px 15px;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #ddd;
+            font-size: 0.90em;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        #status-bar div {
+            padding: 4px 8px;
+            margin: 2px 4px;
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            white-space: nowrap;
+        }
+        #status-bar strong {
+            color: #4a69bb;
+        }
+        .reputation-stars {
+            color: #fbc02d;
+        }
+
+        /* === NAVEGAÇÃO POR ABAS === */
+        #navigation {
+            display: flex;
+            background-color: #5c7fc6;
+            flex-shrink: 0;
+            overflow-x: auto; /* Permite scroll horizontal se muitas abas */
+        }
+        .nav-tab {
+            flex-grow: 1;
+            flex-shrink: 0; /* Para que as abas não encolham demais */
+            padding: 10px 8px;
+            min-width: 80px; /* Largura mínima para cada aba */
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: background-color 0.2s, border-bottom-color 0.2s;
+            font-size: 0.80em; /* Reduzido um pouco mais */
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .nav-tab:hover {
+            background-color: #4a69bb;
+        }
+        .nav-tab.active {
+            background-color: #fff;
+            color: #4a69bb;
+            border-bottom-color: #fbc02d;
+        }
+
+        /* === CONTEÚDO DAS PÁGINAS (ABAS) === */
+        #game-content {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        .page-content {
+            display: none;
+        }
+        .page-content.active {
+            display: block;
+        }
+
+        .panel {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .panel h2 {
+            font-size: 1.2em;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+        .panel h3 {
+            font-size: 1.0em;
+            color: #555;
+            margin-top: 8px;
+            margin-bottom: 6px;
+        }
+        .panel h4 {
+            font-size: 0.95em;
+            color: #666;
+            margin-top: 10px;
+            margin-bottom: 4px;
+        }
+
+
+        /* === BOTÕES, LISTAS, ETC. === */
+        button {
+            background-color: #4a69bb;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+            margin-top: 5px;
+            margin-right: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #3b5998;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .buy-button { background-color: #388e3c; }
+        .buy-button:hover:not(:disabled) { background-color: #2e7d32; }
+        .sell-button { background-color: #d32f2f; }
+        .sell-button:hover:not(:disabled) { background-color: #c62828; }
+        .unlock-button { background-color: #f57c00; }
+        .unlock-button:hover:not(:disabled) { background-color: #ef6c00; }
+        .action-button { background-color: #1976d2; }
+        .action-button:hover:not(:disabled) { background-color: #1565c0; }
+
+
+        ul { list-style: none; }
+        li {
+            background-color: #fff;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 6px;
+        }
+        .upgrade-item, .campaign-item, .employee-type-item {
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+
+        /* === ESTILOS ESPECÍFICOS PARA PÁGINAS === */
+        /* Produtos (Agora Catálogo), Estoque, Funcionários */
+        #product-catalog-list li, #stock-list li, #employee-list li {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .item-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 4px;
+            font-size: 0.85em;
+        }
+        .item-info strong {
+            grid-column: 1 / -1;
+            margin-bottom: 3px;
+            font-size: 1.1em;
+        }
+        .item-actions button {
+            font-size: 0.85em;
+            padding: 6px 10px;
+        }
+        #stock-list .stock-alert-low {
+            color: #f57c00;
+            font-weight: bold;
+        }
+         #stock-list .stock-alert-empty {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+
+        /* Mensagens de Clientes */
+        #customer-messages-panel {
+            max-height: 180px; /* Ajuste conforme necessário */
+            overflow-y: auto;
+        }
+        .customer-message {
+            padding: 6px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            border-left-width: 3px;
+            border-left-style: solid;
+        }
+        .customer-message.positive {
+            background-color: #e8f5e9; /* Verde claro */
+            border-left-color: #4caf50;
+        }
+        .customer-message.negative {
+            background-color: #ffebee; /* Vermelho claro */
+            border-left-color: #f44336;
+        }
+        .customer-message.neutral {
+            background-color: #f1f1f1; /* Cinza claro */
+            border-left-color: #9e9e9e;
+        }
+        .customer-message strong { /* Nome do cliente */
+            color: #555;
+        }
+        
+        /* Finanças */
+        #financial-summary div, #daily-financial-log p { margin-bottom: 4px; font-size: 0.9em;}
+        #daily-financial-log { max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 5px; margin-top: 5px;}
+
+
+        /* LOG DE EVENTOS FIXO */
+        #log-panel-wrapper {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 280px;
+            max-height: 130px;
+            background-color: rgba(40,40,40,0.9);
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75em;
+            padding: 8px;
+            border-radius: 4px;
+            z-index: 1000;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+        #log-panel-wrapper h3 {
+            color: #fff;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 2px;
+            flex-shrink: 0;
+        }
+        #log-messages {
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #log-messages p {
+            margin-bottom: 2px;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 1px;
+            word-break: break-word;
+        }
+
+        /* BOTÃO DE RESET FIXO */
+        #reset-game-button-wrapper {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1001;
+        }
+        #reset-game {
+            background-color: #d32f2f;
+        }
+        .achievement.completed {
+            background-color: #e8f5e9;
+            border-left: 3px solid #4caf50;
+        }
+        .achievement small { display: block; color: #555; }
+
+
+        /* Responsividade Geral */
+        @media (max-width: 768px) {
+            #status-bar { font-size: 0.8em; padding: 4px 8px; }
+            #status-bar div { padding: 3px 6px; margin: 1px 2px;}
+            .nav-tab { font-size: 0.75em; padding: 8px 4px; min-width: 70px;}
+            header h1 { font-size: 1.3em; }
+            .panel h2 { font-size: 1.1em; }
+            button { font-size: 0.85em; padding: 7px 10px; }
+            #log-panel-wrapper { width: calc(100% - 20px); max-height: 100px; font-size: 0.7em;}
+            .item-info { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));}
+        }
+         @media (max-width: 480px) {
+            #status-bar { flex-direction: column; align-items: stretch; }
+            #status-bar div { width: 100%; text-align: center; margin-bottom: 2px;}
+            #navigation { flex-wrap: nowrap; /* Para forçar scroll horizontal se necessário */ } 
+            .nav-tab { flex-basis: auto; flex-grow: 0; min-width: 65px;} /* Permite que abas quebrem linha se necessário */
+             .item-info { grid-template-columns: 1fr; /* Uma coluna em telas muito pequenas */ }
+            #log-panel-wrapper { display: none; } /* Ocultar log em telas muito pequenas para economizar espaço */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <header>
+            <h1>Loja Manager Simulator MAX</h1>
+        </header>
+
+        <div id="status-bar">
+            <div>Saldo: <strong id="balance">R$ 0,00</strong></div>
+            <div>Reputação: <strong id="reputation" class="reputation-stars"></strong></div>
+            <div>Dia: <strong id="day">0</strong></div>
+            <div>Funcionários: <strong id="employee-count">0</strong></div>
+            <div>Custos Fixos/dia: <strong id="fixed-costs-display">R$ 0,00</strong></div>
+        </div>
+
+        <nav id="navigation">
+            <div class="nav-tab active" data-page="loja">Loja</div>
+            <div class="nav-tab" data-page="catalogo">Catálogo</div>
+            <div class="nav-tab" data-page="estoque">Estoque</div>
+            <div class="nav-tab" data-page="marketing">Marketing</div>
+            <div class="nav-tab" data-page="funcionarios">Funcionários</div>
+            <div class="nav-tab" data-page="financas">Finanças</div>
+            <div class="nav-tab" data-page="metas">Metas</div>
+        </nav>
+
+        <main id="game-content">
+            <!-- PÁGINA LOJA (Dashboard) -->
+            <div id="page-loja" class="page-content active">
+                <div class="panel">
+                    <h2>Visão Geral da Loja</h2>
+                    <div id="store-upgrades-summary" class="upgrade-item">
+                        <!-- Conteúdo de upgrades da loja -->
+                    </div>
+                </div>
+                <div class="panel" id="active-campaigns-panel">
+                    <h2>Campanhas de Marketing Ativas</h2>
+                    <ul id="active-campaigns-list"></ul>
+                </div>
+                <div class="panel" id="active-events-panel">
+                    <h2>Eventos Atuais</h2>
+                    <ul id="active-events-list"></ul>
+                </div>
+                <div class="panel">
+                    <h2>Feedback dos Clientes</h2>
+                    <div id="customer-messages-panel">
+                        <!-- Mensagens dos clientes aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA CATÁLOGO (antiga Produtos) -->
+            <div id="page-catalogo" class="page-content">
+                <div class="panel">
+                    <h2>Catálogo de Produtos (Desbloqueio)</h2>
+                    <ul id="product-catalog-list"></ul>
+                </div>
+            </div>
+
+            <!-- PÁGINA ESTOQUE -->
+            <div id="page-estoque" class="page-content">
+                <div class="panel">
+                    <h2>Gerenciar Estoque</h2>
+                    <p>Valor Total do Estoque: <strong id="total-stock-value">R$ 0,00</strong></p>
+                    <ul id="stock-list"></ul>
+                </div>
+            </div>
+
+            <!-- PÁGINA MARKETING -->
+            <div id="page-marketing" class="page-content">
+                <div class="panel">
+                    <h2>Agência de Marketing</h2>
+                     <div class="upgrade-item" id="marketing-agency-summary">
+                        <!-- Conteúdo de upgrade de agência de marketing -->
+                    </div>
+                </div>
+                <div class="panel">
+                    <h2>Campanhas Disponíveis</h2>
+                    <div id="available-marketing-campaigns">
+                        <!-- Campanhas de marketing para lançar -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA FUNCIONÁRIOS -->
+            <div id="page-funcionarios" class="page-content">
+                 <div class="panel">
+                    <h2>Gerenciar Funcionários</h2>
+                    <p>Total Salários/dia: <strong id="total-salaries-display">R$ 0,00</strong></p>
+                    <div id="hire-employee-options"></div>
+                    <hr style="margin: 10px 0;">
+                    <h3>Funcionários Atuais:</h3>
+                    <ul id="employee-list"></ul>
+                </div>
+            </div>
+
+            <!-- PÁGINA FINANÇAS -->
+            <div id="page-financas" class="page-content">
+                 <div class="panel">
+                    <h2>Relatório Financeiro</h2>
+                    <div id="financial-summary">
+                        <!-- Resumo financeiro -->
+                    </div>
+                    <h3>Histórico de Saldo (Últimos <span id="balance-history-days">0</span> dias)</h3>
+                    <div id="finance-chart-container" style="min-height: 150px; height: 20vh;max-height: 200px; border: 1px dashed #ccc; padding: 5px; text-align: center; color: #777;">
+                        <canvas id="balance-chart"></canvas>
+                    </div>
+                    <h3>Log Financeiro Diário (Últimos <span id="daily-log-days-display">0</span> dias)</h3>
+                    <div id="daily-financial-log">
+                        <!-- Log financeiro aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA METAS -->
+            <div id="page-metas" class="page-content">
+                 <div class="panel">
+                    <h2>Metas e Conquistas</h2>
+                    <ul id="achievements-list"></ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="log-panel-wrapper">
+        <h3>Log de Eventos</h3>
+        <div id="log-messages"></div>
+    </div>
+
+    <div id="reset-game-button-wrapper">
+        <button id="reset-game">Resetar Jogo</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // === CONFIGURAÇÕES INICIAIS DO JOGO ===
+        const INITIAL_MONEY = 350;
+        const INITIAL_REPUTATION = 2.5;
+        const MAX_REPUTATION = 5;
+        const MIN_REPUTATION = 0.5;
+        const GAME_TICK_INTERVAL = 4500;
+        const STOCK_BUY_INCREMENTS = [1, 5, 10, 25];
+        const MAX_LOG_MESSAGES = 30;
+        const MAX_BALANCE_HISTORY = 15;
+        const MAX_DAILY_FINANCIAL_LOGS = 7; // Para exibir
+        const MAX_CUSTOMER_MESSAGES = 8;
+
+        const FIXED_COSTS_PER_DAY = { platformFee: 12, utilities: 8, };
+
+        // === CATÁLOGO DE PRODUTOS ===
+        const productCatalog = [
+            { id: "snack_chips", name: "Salgadinho", category: "Snacks", buyPrice: 1.8, sellPrice: 4.0, baseDemand: 0.45, unlocked: true, unlockCost: 0, potentialVisitorsBase: 15 },
+            { id: "drink_soda", name: "Refrigerante", category: "Snacks", buyPrice: 2.2, sellPrice: 5.0, baseDemand: 0.5, unlocked: true, unlockCost: 0, potentialVisitorsBase: 18 },
+            { id: "clothing_tshirt", name: "Camiseta", category: "Roupas", buyPrice: 12, sellPrice: 30, baseDemand: 0.25, unlocked: false, unlockCost: 180, potentialVisitorsBase: 8 },
+            { id: "clothing_jeans", name: "Calça Jeans", category: "Roupas", buyPrice: 45, sellPrice: 110, baseDemand: 0.18, unlocked: false, unlockCost: 450, potentialVisitorsBase: 5 },
+            { id: "electronics_headphone", name: "Fone Ouvido", category: "Eletrônicos", buyPrice: 35, sellPrice: 80, baseDemand: 0.28, unlocked: false, unlockCost: 300, potentialVisitorsBase: 10 },
+            { id: "electronics_powerbank", name: "Carregador Portátil", category: "Eletrônicos", buyPrice: 55, sellPrice: 130, baseDemand: 0.22, unlocked: false, unlockCost: 550, potentialVisitorsBase: 7 },
+            { id: "books_bestseller", name: "Livro Popular", category: "Livros", buyPrice: 20, sellPrice: 48, baseDemand: 0.20, unlocked: false, unlockCost: 250, potentialVisitorsBase: 6},
+            { id: "home_coffeemug", name: "Caneca Temática", category: "Casa", buyPrice: 10, sellPrice: 28, baseDemand: 0.26, unlocked: false, unlockCost: 150, potentialVisitorsBase: 9},
+            { id: "toys_actionfigure", name: "Action Figure", category: "Brinquedos", buyPrice: 40, sellPrice: 95, baseDemand: 0.15, unlocked: false, unlockCost: 500, potentialVisitorsBase: 4},
+        ];
+
+        // === NÍVEIS DE UPGRADE DE LOJA ===
+        const storeUpgrades = [
+            { cost: 0, effect: 1.0 },    { cost: 180, effect: 1.10 }, { cost: 450, effect: 1.25 },
+            { cost: 1000, effect: 1.45 },{ cost: 2200, effect: 1.70 },{ cost: 5000, effect: 2.00 }
+        ];
+
+        // === MARKETING ===
+        const marketingAgencyTiers = [ // Antigo marketingUpgrades, renomeado
+            { cost: 0, name: "Básico", campaignEffectiveness: 1.0, campaignCostModifier: 1.0 },
+            { cost: 150, name: "Bronze", campaignEffectiveness: 1.1, campaignCostModifier: 0.95 },
+            { cost: 400, name: "Prata", campaignEffectiveness: 1.2, campaignCostModifier: 0.9 },
+            { cost: 900, name: "Ouro", campaignEffectiveness: 1.35, campaignCostModifier: 0.85 },
+            { cost: 2000, name: "Platina", campaignEffectiveness: 1.5, campaignCostModifier: 0.8 },
+        ];
+
+        const marketingCampaigns = [
+            { id: "local_flyers", name: "Panfletagem Local", baseCost: 70, duration: 2, effects: [{type: "visitor_multiplier_temp", value: 1.15}], description: "+15% Visitantes por 2 dias.", unlockedAtTier: 0 },
+            { id: "social_media_basic", name: "Postagens Sociais", baseCost: 120, duration: 3, effects: [{type: "visitor_multiplier_temp", value: 1.10}, {type: "demand_multiplier_temp", value: 1.05, targetCategories: ["Snacks", "Roupas"]}], description: "+10% Visitantes, +5% Demanda (Snacks, Roupas) por 3 dias.", unlockedAtTier: 0 },
+            { id: "email_marketing_list", name: "E-mail Marketing", baseCost: 250, duration: 4, effects: [{type: "sale_conversion_temp", value: 1.05}, {type: "visitor_multiplier_temp", value: 1.08}], description: "+5% Conversão, +8% Visitantes por 4 dias.", unlockedAtTier: 1 },
+            { id: "influencer_micro", name: "Micro-Influencer", baseCost: 400, duration: 2, effects: [{type: "visitor_multiplier_temp", value: 1.25}, {type: "reputation_temp_boost", value: 0.1}], description: "+25% Visitantes, +0.1 Rep por 2 dias.", unlockedAtTier: 2 },
+            { id: "targeted_ads", name: "Anúncios Direcionados", baseCost: 600, duration: 5, effects: [{type: "demand_multiplier_temp", value: 1.15, targetCategories: ["Eletrônicos", "Livros"]}], description: "+15% Demanda (Eletrônicos, Livros) por 5 dias.", unlockedAtTier: 3},
+            { id: "brand_awareness_large", name: "Campanha de Marca", baseCost: 1000, duration: 7, effects: [{type: "visitor_multiplier_temp", value: 1.20}, {type: "reputation_perm_boost_on_finish", value: 0.05}], description: "+20% Visitantes por 7 dias. Chance de +0.05 Reputação perm. ao final.", unlockedAtTier: 4}
+        ];
+
+        // === FUNCIONÁRIOS ===
+        const employeeTypes = [
+            { id: "vendedor_jr", name: "Vendedor Jr.", hireCost: 80, salaryPerDay: 15, effectType: "sale_conversion_boost", effectValue: 0.03, description: "+3% chance de venda", maxHirable: 3 },
+            { id: "vendedor_pl", name: "Vendedor Pl.", hireCost: 250, salaryPerDay: 40, effectType: "sale_conversion_boost", effectValue: 0.07, description: "+7% chance de venda", maxHirable: 2 },
+            { id: "marketing_as", name: "Assist. Marketing", hireCost: 200, salaryPerDay: 30, effectType: "marketing_effectiveness_boost", effectValue: 0.05, description: "+5% eficácia de campanhas de marketing", maxHirable: 1 },
+            { id: "estoquista", name: "Estoquista", hireCost: 150, salaryPerDay: 25, effectType: "stock_cost_reduction", effectValue: 0.02, description: "-2% custo de compra de estoque, reduz chance de perder cliente por falta de estoque.", maxHirable: 1 },
+            { id: "gerente_loja", name: "Gerente de Loja", hireCost: 500, salaryPerDay: 80, effectType: "overall_efficiency_boost", effectValue: 0.05, description: "+5% eficiência geral (vendas, demanda), +10% moral de outros funcionários.", maxHirable: 1 },
+        ];
+        const BASE_MORALE = 1.0;
+        const MIN_MORALE = 0.7;
+        const MAX_MORALE = 1.2;
+
+        // === EVENTOS ALEATÓRIOS ===
+        const randomEventsPool = [
+            { id: "viral_hit_product", name: "Produto Viralizou!", duration: 2, description: "Um produto seu está bombando! Demanda específica +50% por 2 dias.", effectTarget: "specific_product_demand", effectValue: 1.5, type: "good", needsProduct: true },
+            { id: "influencer_shoutout", name: "Influencer Elogiou!", duration: 3, description: "Um influencer mencionou sua loja! Visitantes +30% e Reputação +0.3 por 3 dias.", effectTarget: "visitor_multiplier", effectValue: 1.3, secondaryEffectTarget: "reputation", secondaryEffectValue: 0.3, type: "good" },
+            { id: "seasonal_rush", name: "Pico Sazonal", duration: 2, description: "Época de alta procura! Visitantes +25%, Chance de Venda +5% por 2 dias.", effectTarget: "visitor_multiplier", effectValue: 1.25, secondaryEffectTarget: "sale_conversion", secondaryEffectValue: 1.05, type: "good" },
+            { id: "supplier_promo", name: "Promoção Fornecedor", duration: 2, description: "Seu fornecedor está com desconto! Custo de compra -15% por 2 dias.", effectTarget: "buy_price", effectValue: 0.85, type: "good" },
+            { id: "happy_customer_wave", name: "Onda de Clientes Felizes", duration: 1, isInstant: true, description: "Muitos clientes satisfeitos! Reputação +0.5.", effectTarget: "reputation", effectValue: 0.5, type: "good" },
+            { id: "negative_buzz", name: "Boato Negativo", duration: 3, description: "Rumores ruins sobre sua loja. Visitantes -20%, Reputação -0.4 por 3 dias.", effectTarget: "visitor_multiplier", effectValue: 0.8, secondaryEffectTarget: "reputation", secondaryEffectValue: -0.4, type: "bad" },
+            { id: "competitor_sale", name: "Promoção Concorrente", duration: 2, description: "Concorrência agressiva! Demanda Geral -20% por 2 dias.", effectTarget: "demand", effectValue: 0.8, type: "bad" },
+            { id: "logistics_issue", name: "Problema Logístico", duration: 3, description: "Atrasos na entrega aos clientes. Chance de venda -10%, Reputação -0.2 por 3 dias.", effectTarget: "sale_conversion", effectValue: 0.9, secondaryEffectTarget: "reputation", secondaryEffectValue: -0.2, type: "bad" },
+            { id: "economic_downturn_lite", name: "Pequena Retração", duration: 4, description: "Clientes gastando menos. Demanda Geral -10%, Visitantes -10% por 4 dias.", effectTarget: "demand", effectValue: 0.9, secondaryEffectTarget: "visitor_multiplier", secondaryEffectValue: 0.9, type: "bad" },
+            { id: "picky_customers", name: "Clientes Exigentes", duration: 2, description: "Clientes estão mais difíceis de agradar. Chance de venda -15% por 2 dias.", effectTarget: "sale_conversion", effectValue: 0.85, type: "bad"},
+        ];
+        const EVENT_CHANCE_PER_DAY = 0.28;
+
+        // === MENSAGENS DE CLIENTES ===
+        const customerMessageTemplates = {
+            positive: [ "Adorei {productName}! Chegou rápido e é de ótima qualidade. 🤩", "Melhor loja! Sempre encontro o que preciso. 👍", "Atendimento excelente e {productName} perfeito. Recomendo!", "Compra fácil e entrega no prazo. {productName} é show!", "Minha experiência foi ótima. Com certeza comprarei de novo. 😊", ],
+            negative_stock: [ "Queria tanto {productName}, mas estava esgotado... 😔 Que pena.", "Não acredito que não tinha {productName} em estoque! 😠", "Fui comprar {productName} e... nada. Decepcionado.", "Por favor, reponham {productName}! Preciso muito.", ],
+            negative_general: [ "Achei os preços um pouco altos... 😟", "Demorou um pouco para o site carregar.", "Não encontrei exatamente o que eu procurava.", "Esperava um pouco mais da loja, para ser sincero. 😕", ],
+            neutral: [ "Acabei de fazer um pedido. Aguardando...", "Vi {productName} na loja. Parece interessante.", "Considerando comprar algo em breve.", ]
+        };
+        const CUSTOMER_MESSAGE_CHANCE_PER_DAY = 0.4;
+
+        // === METAS E CONQUISTAS (EXPANDIDO) ===
+        const achievementsConfig = [
+            // Dinheiro
+            { id: "money_1k", name: "Primeiro Milhar", description: "Alcançar R$ 1.000 em saldo.", type: "money", target: 1000, reward: { money: 150, reputation: 0.1 } },
+            { id: "money_10k", name: "Dez Mil na Mão", description: "Alcançar R$ 10.000 em saldo.", type: "money", target: 10000, reward: { money: 1000, reputation: 0.1 } },
+            { id: "money_50k", name: "Cinquentão", description: "Alcançar R$ 50.000 em saldo.", type: "money", target: 50000, reward: { money: 5000, reputation: 0.2 } },
+            { id: "money_100k", name: "Seis Dígitos", description: "Alcançar R$ 100.000 em saldo.", type: "money", target: 100000, reward: { money: 10000, reputation: 0.3 } },
+            // Reputação
+            { id: "rep_4_stars", name: "Excelente Reputação", description: "Alcançar 4 estrelas.", type: "reputation", target: 4.0, reward: { money: 400 } },
+            { id: "rep_5_stars", name: "Reputação Máxima", description: "Alcançar 5 estrelas de reputação.", type: "reputation", target: 5.0, reward: { money: 2000, permanentEffects: [{ type: "visitor_multiplier_perm", value: 1.05, description: "+5% Visitantes Perm." }] } },
+            // Lucro
+            { id: "profit_5k", name: "Mestre dos Lucros", description: "Acumular R$ 5.000 de lucro total.", type: "total_profit", target: 5000, reward: { money: 750, reputation: 0.3 } },
+            { id: "profit_25k", name: "Lucro Sólido", description: "Acumular R$ 25.000 de lucro total.", type: "total_profit", target: 25000, reward: { money: 2500 } },
+            { id: "profit_100k", name: "Mestre das Finanças", description: "Acumular R$ 100.000 de lucro total.", type: "total_profit", target: 100000, reward: { money: 10000, reputation: 0.5 } },
+            // Desbloqueios
+            { id: "unlock_3_cat", name: "Diversificando Pro", description: "Desbloquear produtos de 3 categorias.", type: "categories_unlocked", target: 3, reward: { money: 250 } },
+            { id: "all_products_snacks", name: "Rei dos Snacks", description: "Desbloquear todos os produtos de Snacks.", type: "all_products_category", targetCategory: "Snacks", reward: { money: 250}},
+            { id: "unlock_all_clothes", name: "Magnata da Moda", description: "Desbloquear todos os produtos de Roupas.", type: "all_products_category", targetCategory: "Roupas", reward: { money: 500 } },
+            { id: "unlock_all_electronics", name: "Guru da Tecnologia", description: "Desbloquear todos os produtos de Eletrônicos.", type: "all_products_category", targetCategory: "Eletrônicos", reward: { money: 750 } },
+            { id: "unlock_all_products", name: "Rei do Varejo", description: "Desbloquear todos os produtos do catálogo.", type: "all_products_unlocked", reward: { money: 5000, reputation: 0.5 } }, // Target dinâmico
+            // Funcionários
+            { id: "hire_2_employee", name: "Expandindo Equipe", description: "Contratar 2 funcionários.", type: "employees_hired", target: 2, reward: { reputation: 0.2, money: 100 } },
+            { id: "hire_5_employees", name: "Gerente de Equipe", description: "Contratar 5 funcionários.", type: "employees_hired", target: 5, reward: { money: 500 } },
+            { id: "hire_manager", name: "Chefe na Área", description: "Contratar um Gerente de Loja.", type: "employee_type_hired", targetTypeId: "gerente_loja", reward: { money: 300, reputation: 0.1 } },
+            { id: "hire_estoquista", name: "Mestre do Estoque", description: "Contratar um Estoquista.", type: "employee_type_hired", targetTypeId: "estoquista", reward: { money: 200 } },
+            // Upgrades
+            { id: "max_marketing_tier", name: "Agência Top", description: "Agência de Marketing Nível Máximo.", type: "marketing_tier", target: marketingAgencyTiers.length - 1, reward: { reputation: 0.3, money: 500 }},
+            { id: "max_store_level", name: "Loja Palácio", description: "Melhorias da Loja Nível Máximo.", type: "store_level", target: storeUpgrades.length - 1, reward: { money: 1000, reputation: 0.2 } },
+            // Marcos
+            { id: "stock_value_1k", name: "Estoquista Nato", description: "Valor total do estoque atingir R$1000.", type: "total_stock_value", target: 1000, reward: {money: 200}},
+            { id: "days_100", name: "Veterano (100 Dias)", description: "Operar a loja por 100 dias.", type: "days_passed", target: 100, reward: { money: 1000 } },
+            { id: "days_365", name: "Aniversário da Loja!", description: "Operar a loja por 365 dias.", type: "days_passed", target: 365, reward: { money: 5000, reputation: 0.3, permanentEffects: [{ type: "fixed_cost_reduction_perm", value: 0.1, description: "-10% Custos Fixos Perm." }] } },
+            { id: "total_revenue_100k", name: "Faturamento de Cem Mil", description: "Alcançar R$ 100.000 em faturamento total (vendas brutas).", type: "total_revenue", target: 100000, reward: { money: 1000 } },
+            // Marketing
+            { id: "run_5_campaigns", name: "Marqueteiro Ativo", description: "Executar 5 campanhas de marketing.", type: "marketing_campaigns_run", target: 5, reward: { money: 300 } },
+            { id: "run_15_campaigns", name: "Mestre do Marketing", description: "Executar 15 campanhas de marketing.", type: "marketing_campaigns_run", target: 15, reward: { money: 1000, reputation: 0.2 } },
+            // Outros
+            { id: "survive_3_bads", name: "Sobrevivente", description: "Sobreviver a 3 eventos negativos sem falir.", type: "bad_events_survived", target: 3, reward: { reputation: 0.2, money: 250 } },
+            { id: "diversified_sales_day", name: "Vendedor Versátil", description: "Vender produtos de 3 categorias diferentes em um único dia.", type: "diversified_sales_day", target: 3, reward: { money: 150 } },
+        ];
+        // Ajuste dinâmico do target para 'unlock_all_products'
+        const achUnlockAll = achievementsConfig.find(a => a.id === "unlock_all_products");
+        if (achUnlockAll) achUnlockAll.target = productCatalog.length;
+
+
+        // === ESTADO DO JOGO ===
+        let gameData = {};
+        let balanceChartInstance = null;
+        let gameLoopIntervalId = null;
+
+        // === ELEMENTOS DA UI (seletores principais) ===
+        const ui = {
+            balance: document.getElementById('balance'),
+            reputation: document.getElementById('reputation'),
+            day: document.getElementById('day'),
+            employeeCount: document.getElementById('employee-count'),
+            fixedCostsDisplay: document.getElementById('fixed-costs-display'),
+            navTabs: document.querySelectorAll('.nav-tab'),
+            pages: document.querySelectorAll('.page-content'),
+            // Loja
+            storeUpgradesSummary: document.getElementById('store-upgrades-summary'),
+            activeCampaignsList: document.getElementById('active-campaigns-list'),
+            activeEventsList: document.getElementById('active-events-list'),
+            customerMessagesPanel: document.getElementById('customer-messages-panel'),
+            // Catálogo
+            productCatalogList: document.getElementById('product-catalog-list'),
+            // Estoque
+            totalStockValue: document.getElementById('total-stock-value'),
+            stockList: document.getElementById('stock-list'),
+            // Marketing
+            marketingAgencySummary: document.getElementById('marketing-agency-summary'),
+            availableMarketingCampaigns: document.getElementById('available-marketing-campaigns'),
+            // Funcionários
+            totalSalariesDisplay: document.getElementById('total-salaries-display'),
+            hireEmployeeOptions: document.getElementById('hire-employee-options'),
+            employeeList: document.getElementById('employee-list'),
+            // Finanças
+            financialSummary: document.getElementById('financial-summary'),
+            balanceHistoryDays: document.getElementById('balance-history-days'),
+            balanceChartCanvas: document.getElementById('balance-chart').getContext('2d'),
+            dailyFinancialLog: document.getElementById('daily-financial-log'),
+            dailyLogDaysDisplay: document.getElementById('daily-log-days-display'),
+            // Metas
+            achievementsList: document.getElementById('achievements-list'),
+            // Log e Reset
+            logMessages: document.getElementById('log-messages'),
+            resetGameBtn: document.getElementById('reset-game'),
+        };
+
+        // === FUNÇÕES AUXILIARES ===
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function addLog(message, type = 'info') {
+            const timestamp = `D${gameData.day}: `;
+            gameData.logMessages.unshift({ text: timestamp + message, type });
+            if (gameData.logMessages.length > MAX_LOG_MESSAGES) gameData.logMessages.pop();
+            renderLog();
+        }
+        function renderLog() { ui.logMessages.innerHTML = gameData.logMessages.map(msg => `<p class="log-${msg.type}">${msg.text}</p>`).join(''); }
+        
+        function updateReputation(change) {
+            gameData.reputation = parseFloat((gameData.reputation + change).toFixed(2));
+            gameData.reputation = Math.max(MIN_REPUTATION, Math.min(MAX_REPUTATION, gameData.reputation));
+            checkAchievements();
+        }
+        function calculateTotalFixedCosts() {
+            let baseCosts = Object.values(FIXED_COSTS_PER_DAY).reduce((sum, cost) => sum + cost, 0);
+            const reductionEffect = gameData.permanentEffects.find(eff => eff.type === "fixed_cost_reduction_perm");
+            if (reductionEffect) {
+                baseCosts *= (1 - reductionEffect.value);
+            }
+            return baseCosts;
+        }
+
+        function getRandomElement(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function applyPermanentEffects() {
+            // Esta função é chamada no início do dia ou ao carregar o jogo para aplicar bônus.
+            // Atualmente, os efeitos são aplicados diretamente onde são relevantes (custos fixos, visitantes)
+            // mas poderia ser centralizado aqui se houvesse mais tipos.
+        }
+
+
+        // === FUNÇÕES DE RENDERIZAÇÃO DA UI ===
+        function renderAllUI() {
+            renderStatusBar();
+            const activePageId = document.querySelector('.nav-tab.active').dataset.page;
+            switch(activePageId) {
+                case 'loja': renderLojaPage(); break;
+                case 'catalogo': renderCatalogoPage(); break;
+                case 'estoque': renderEstoquePage(); break;
+                case 'marketing': renderMarketingPage(); break;
+                case 'funcionarios': renderFuncionariosPage(); break;
+                case 'financas': renderFinancasPage(); break;
+                case 'metas': renderMetasPage(); break;
+            }
+        }
+
+        function renderStatusBar() {
+            ui.balance.textContent = formatCurrency(gameData.money);
+            let stars = '';
+            const fullStars = Math.floor(gameData.reputation);
+            const halfStar = gameData.reputation % 1 >= 0.4 && gameData.reputation % 1 <= 0.6;
+            for (let i = 0; i < fullStars; i++) stars += '★';
+            if (halfStar && fullStars < MAX_REPUTATION) stars += '✬';
+            else if (gameData.reputation % 1 > 0.6 && fullStars < MAX_REPUTATION) stars += '★';
+            const emptyStars = MAX_REPUTATION - Math.ceil(gameData.reputation);
+            for (let i = 0; i < emptyStars; i++) stars += '☆';
+            ui.reputation.innerHTML = `${stars} (${gameData.reputation.toFixed(1)})`;
+            ui.day.textContent = gameData.day;
+            ui.employeeCount.textContent = gameData.employees.length;
+            ui.fixedCostsDisplay.textContent = formatCurrency(calculateTotalFixedCosts());
+        }
+
+        function renderLojaPage() {
+            // Upgrades da Loja
+            const storeLvl = gameData.storeUpgradeLevel;
+            const storeEffectPercent = ((storeUpgrades[storeLvl].effect - 1) * 100).toFixed(0);
+            let storeUpgradeHTML = `<h4>Melhorias da Loja</h4>
+                <p>Nível Atual: <span id="store-upgrade-current-level">${storeLvl}</span></p>
+                <p>Efeito Atual: +<span id="store-effect-display">${storeEffectPercent}</span>% Taxa de Venda</p>`;
+            if (storeLvl < storeUpgrades.length - 1) {
+                const nextLvl = storeUpgrades[storeLvl + 1];
+                storeUpgradeHTML += `<button id="upgrade-store-btn" class="action-button" ${gameData.money < nextLvl.cost ? 'disabled' : ''}>
+                    Melhorar (Nível ${storeLvl + 1}) - Custo: ${formatCurrency(nextLvl.cost)}
+                </button>`;
+            } else {
+                storeUpgradeHTML += `<p>Nível Máximo Atingido!</p>`;
+            }
+            ui.storeUpgradesSummary.innerHTML = storeUpgradeHTML;
+            if (ui.storeUpgradesSummary.querySelector('#upgrade-store-btn')) {
+                ui.storeUpgradesSummary.querySelector('#upgrade-store-btn').addEventListener('click', handleUpgradeStore);
+            }
+
+            // Campanhas Ativas
+            if (gameData.activeMarketingCampaigns.length > 0) {
+                ui.activeCampaignsList.innerHTML = gameData.activeMarketingCampaigns.map(campaign => {
+                    const campaignConfig = marketingCampaigns.find(c => c.id === campaign.id);
+                    return `<li><strong>${campaignConfig.name}</strong>: ${campaignConfig.description} (Dias restantes: ${campaign.durationRemaining})</li>`;
+                }).join('');
+            } else {
+                ui.activeCampaignsList.innerHTML = '<li>Nenhuma campanha de marketing ativa.</li>';
+            }
+
+            // Eventos Ativos
+            if (gameData.activeEvents.length > 0) {
+                ui.activeEventsList.innerHTML = gameData.activeEvents.map(event =>
+                    `<li><strong>${event.name}</strong>: ${event.description} (Dias restantes: ${event.durationRemaining})</li>`
+                ).join('');
+            } else {
+                ui.activeEventsList.innerHTML = '<li>Nenhum evento aleatório ativo no momento.</li>';
+            }
+            // Mensagens de Clientes
+            renderCustomerMessages();
+        }
+
+        function renderCustomerMessages() {
+            ui.customerMessagesPanel.innerHTML = gameData.customerMessages.map(msg => {
+                let customerName = getRandomElement(["Cliente Satisfeito", "Comprador Anônimo", "Novo Cliente", "Usuário Fiel", "Avaliador"]);
+                if(msg.type.startsWith("negative")) customerName = getRandomElement(["Cliente Insatisfeito", "Comprador Decepcionado", "Usuário Irritado"]);
+
+                return `<div class="customer-message ${msg.type}">
+                            <p><strong>${customerName}:</strong> ${msg.text.replace("{productName}", msg.productName || "um produto")}</p>
+                        </div>`;
+            }).join('');
+        }
+
+        function renderCatalogoPage() {
+            ui.productCatalogList.innerHTML = '';
+            gameData.products.forEach(product => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="item-info">
+                        <strong>${product.name} (${product.category})</strong>
+                        <span>Compra: ${formatCurrency(product.buyPrice)}</span>
+                        <span>Venda: ${formatCurrency(product.sellPrice)}</span>
+                        <span>Demanda Base: ${(product.baseDemand * 100).toFixed(0)}%</span>
+                        <span>Visitantes Base/dia: ${product.potentialVisitorsBase}</span>
+                    </div>
+                    <div class="item-actions">
+                        ${!product.unlocked ?
+                            `<button class="unlock-button" data-id="${product.id}" ${gameData.money < product.unlockCost ? 'disabled' : ''}>
+                                Desbloquear (${formatCurrency(product.unlockCost)})
+                            </button>` :
+                            `<span style="color:green; font-weight:bold;">Produto Desbloqueado</span>`
+                        }
+                    </div>
+                `;
+                ui.productCatalogList.appendChild(li);
+            });
+            ui.productCatalogList.querySelectorAll('.unlock-button').forEach(button => {
+                button.addEventListener('click', (e) => handleUnlockProduct(e.target.dataset.id));
+            });
+        }
+
+        function renderEstoquePage() {
+            ui.stockList.innerHTML = '';
+            let totalValue = 0;
+            let stockCostReduction = 0;
+            const estoquista = gameData.employees.find(emp => emp.typeId === 'estoquista');
+            if (estoquista) {
+                 const estoquistaType = employeeTypes.find(et => et.id === 'estoquista');
+                 stockCostReduction = estoquistaType.effectValue * estoquista.morale;
+            }
+
+            gameData.products.forEach(product => {
+                if (!product.unlocked) return;
+
+                const li = document.createElement('li');
+                let effectiveBuyPrice = product.buyPrice * (gameData.eventModifiers.buy_price_multiplier || 1);
+                effectiveBuyPrice *= (1 - stockCostReduction); // Aplicar redução do estoquista
+
+                const stockValue = product.stock * effectiveBuyPrice;
+                totalValue += stockValue;
+
+                let stockStatusClass = "";
+                if (product.stock === 0) stockStatusClass = "stock-alert-empty";
+                else if (product.stock < product.potentialVisitorsBase / 2 && product.stock < 10) stockStatusClass = "stock-alert-low";
+
+                let buyButtonsHTML = '';
+                STOCK_BUY_INCREMENTS.forEach(amount => {
+                    const cost = effectiveBuyPrice * amount;
+                    buyButtonsHTML += `<button class="buy-button buy-stock-btn" data-id="${product.id}" data-amount="${amount}" 
+                                        ${gameData.money < cost ? 'disabled' : ''}>
+                                        +${amount} (${formatCurrency(cost)})
+                                      </button>`;
+                });
+
+                li.innerHTML = `
+                    <div class="item-info">
+                        <strong>${product.name}</strong>
+                        <span class="${stockStatusClass}">Estoque Atual: ${product.stock}</span>
+                        <span>Compra Un.: ${formatCurrency(effectiveBuyPrice)}</span>
+                        <span>Valor Estoque: ${formatCurrency(stockValue)}</span>
+                    </div>
+                    <div class="item-actions">
+                        ${buyButtonsHTML}
+                    </div>
+                `;
+                ui.stockList.appendChild(li);
+            });
+            ui.totalStockValue.textContent = formatCurrency(totalValue);
+            gameData.currentTotalStockValue = totalValue;
+            checkAchievements();
+
+            ui.stockList.querySelectorAll('.buy-stock-btn').forEach(button => {
+                button.addEventListener('click', (e) => handleBuyStock(e.target.dataset.id, parseInt(e.target.dataset.amount)));
+            });
+        }
+
+        function renderMarketingPage() {
+            const currentTier = gameData.marketingAgencyTier;
+            const tierConfig = marketingAgencyTiers[currentTier];
+            let agencyHTML = `<h4>Agência: ${tierConfig.name}</h4>
+                <p>Eficácia de Campanha: +${((tierConfig.campaignEffectiveness - 1) * 100).toFixed(0)}%</p>
+                <p>Custo de Campanha: ${((1 - tierConfig.campaignCostModifier) * 100).toFixed(0)}% de desconto</p>`;
+            if (currentTier < marketingAgencyTiers.length - 1) {
+                const nextTier = marketingAgencyTiers[currentTier + 1];
+                agencyHTML += `<button id="upgrade-agency-btn" class="action-button" ${gameData.money < nextTier.cost ? 'disabled' : ''}>
+                    Contratar Agência ${nextTier.name} - Custo: ${formatCurrency(nextTier.cost)}
+                </button>`;
+            } else {
+                agencyHTML += `<p>Agência Nível Máximo Contratada!</p>`;
+            }
+            ui.marketingAgencySummary.innerHTML = agencyHTML;
+            if (ui.marketingAgencySummary.querySelector('#upgrade-agency-btn')) {
+                ui.marketingAgencySummary.querySelector('#upgrade-agency-btn').addEventListener('click', handleUpgradeMarketingAgency);
+            }
+
+            // Renderizar Campanhas Disponíveis
+            ui.availableMarketingCampaigns.innerHTML = '';
+            marketingCampaigns.forEach(campaign => {
+                if (campaign.unlockedAtTier <= currentTier) {
+                    const isRunning = gameData.activeMarketingCampaigns.some(ac => ac.id === campaign.id);
+                    const tier = marketingAgencyTiers[gameData.marketingAgencyTier];
+                    let finalCost = campaign.baseCost * tier.campaignCostModifier;
+                    
+                    let marketingAssistantBoost = 1;
+                    gameData.employees.forEach(emp => {
+                        if (emp.typeId === 'marketing_as') {
+                            const empType = employeeTypes.find(et => et.id === emp.typeId);
+                            marketingAssistantBoost += (empType.effectValue * emp.morale);
+                        }
+                    });
+                    // Marketing assistant não reduz custo, mas aumenta eficácia (já aplicado em simulateDay)
+
+                    ui.availableMarketingCampaigns.innerHTML += `
+                        <div class="campaign-item">
+                            <strong>${campaign.name}</strong>
+                            <p>${campaign.description}</p>
+                            <p>Custo: ${formatCurrency(finalCost)} | Duração: ${campaign.duration} dias</p>
+                            <button class="action-button run-campaign-btn" data-id="${campaign.id}" 
+                                    ${isRunning || gameData.money < finalCost ? 'disabled' : ''}>
+                                ${isRunning ? 'Em Execução' : 'Lançar Campanha'}
+                            </button>
+                        </div>
+                    `;
+                }
+            });
+            ui.availableMarketingCampaigns.querySelectorAll('.run-campaign-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => handleRunMarketingCampaign(e.target.dataset.id));
+            });
+        }
+        
+        function renderFuncionariosPage() {
+            const totalSalaries = gameData.employees.reduce((sum, emp) => {
+                const type = employeeTypes.find(et => et.id === emp.typeId);
+                return sum + (type ? type.salaryPerDay : 0);
+            }, 0);
+            ui.totalSalariesDisplay.textContent = formatCurrency(totalSalaries);
+
+            ui.hireEmployeeOptions.innerHTML = '<h4>Contratar Novo Funcionário:</h4>';
+            employeeTypes.forEach(type => {
+                const canAfford = gameData.money >= type.hireCost;
+                const currentOfType = gameData.employees.filter(emp => emp.typeId === type.id).length;
+                const atMaxCapacity = currentOfType >= type.maxHirable;
+
+                ui.hireEmployeeOptions.innerHTML += `
+                    <div class="employee-type-item">
+                        <strong>${type.name}</strong>
+                        <p>Custo: ${formatCurrency(type.hireCost)} | Salário: ${formatCurrency(type.salaryPerDay)}/dia</p>
+                        <p>Efeito: ${type.description} (Contratados: ${currentOfType}/${type.maxHirable})</p>
+                        <button class="action-button hire-employee-btn" data-typeid="${type.id}" 
+                                ${!canAfford || atMaxCapacity ? 'disabled' : ''}>
+                            Contratar ${atMaxCapacity ? '(Limite Atingido)' : ''}
+                        </button>
+                    </div>
+                `;
+            });
+             ui.hireEmployeeOptions.querySelectorAll('.hire-employee-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => handleHireEmployee(e.target.dataset.typeid));
+            });
+
+            ui.employeeList.innerHTML = '';
+            if (gameData.employees.length === 0) {
+                ui.employeeList.innerHTML = '<p>Você não tem funcionários.</p>';
+            } else {
+                gameData.employees.forEach(emp => {
+                    const type = employeeTypes.find(et => et.id === emp.typeId);
+                    const moralePercentage = (emp.morale * 100).toFixed(0);
+                    let moraleColor = emp.morale > 1.0 ? 'green' : (emp.morale < BASE_MORALE ? 'orange' : 'inherit');
+
+                    ui.employeeList.innerHTML += `
+                        <li>
+                            <div class="item-info">
+                                <strong>${type.name} #${emp.uniqueId}</strong>
+                                <span>Salário: ${formatCurrency(type.salaryPerDay)}/dia</span>
+                                <span>Efeito Base: ${type.description}</span>
+                                <span>Moral: <strong style="color:${moraleColor};">${moralePercentage}%</strong> (Efetividade: x${emp.morale.toFixed(2)})</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="sell-button fire-employee-btn" data-uniqueid="${emp.uniqueId}">
+                                    Demitir (Custo: ${formatCurrency(type.salaryPerDay * 2)}) <!-- Penalidade por demissão -->
+                                </button>
+                            </div>
+                        </li>
+                    `;
+                });
+                ui.employeeList.querySelectorAll('.fire-employee-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleFireEmployee(e.target.dataset.uniqueid));
+                });
+            }
+        }
+
+        function renderFinancasPage() {
+            const today = gameData.financesToday;
+            const totalExpensesToday = today.salaries + today.fixedCosts + today.cogs;
+            const netProfitToday = today.revenue - totalExpensesToday;
+            
+            let avgProfitMargin = 0;
+            if (gameData.totalRevenue > 0) {
+                avgProfitMargin = (gameData.totalProfit / gameData.totalRevenue) * 100;
+            }
+
+            ui.financialSummary.innerHTML = `
+                <h4>Resumo do Dia (D${gameData.day}):</h4>
+                <div>Receita Bruta (Vendas): <strong style="color:green;">${formatCurrency(today.revenue)}</strong></div>
+                <div>Custo Merc. Vendidas (CMV): <strong style="color:red;">-${formatCurrency(today.cogs)}</strong></div>
+                <div>Salários Pagos: <strong style="color:red;">-${formatCurrency(today.salaries)}</strong></div>
+                <div>Custos Fixos: <strong style="color:red;">-${formatCurrency(today.fixedCosts)}</strong></div>
+                <div><strong>Lucro/Prejuízo Hoje: <strong style="${netProfitToday >= 0 ? 'color:green;' : 'color:red;'}">${formatCurrency(netProfitToday)}</strong></strong></div>
+                <hr style="margin: 5px 0;">
+                <h4>Resumo Geral:</h4>
+                <div>Lucro Total Acumulado: <strong>${formatCurrency(gameData.totalProfit)}</strong></div>
+                <div>Receita Bruta Total: <strong>${formatCurrency(gameData.totalRevenue)}</strong></div>
+                <div>Margem de Lucro Média: <strong>${avgProfitMargin.toFixed(1)}%</strong></div>
+            `;
+            ui.balanceHistoryDays.textContent = Math.min(MAX_BALANCE_HISTORY, gameData.day);
+            renderBalanceChart();
+
+            // Renderizar Log Financeiro Diário
+            ui.dailyFinancialLog.innerHTML = '';
+            const logsToShow = gameData.dailyFinancialLogs.slice(-MAX_DAILY_FINANCIAL_LOGS);
+            logsToShow.reverse().forEach(log => { // Mostrar mais recente primeiro
+                const expenses = log.cogs + log.salaries + log.fixedCosts;
+                const profit = log.revenue - expenses;
+                ui.dailyFinancialLog.innerHTML += `
+                    <p><strong>Dia ${log.day}:</strong> 
+                    Receita: ${formatCurrency(log.revenue)} | 
+                    Despesas: ${formatCurrency(expenses)} | 
+                    Lucro: <span style="${profit >=0 ? 'color:green' : 'color:red'}">${formatCurrency(profit)}</span>
+                    </p>
+                `;
+            });
+            ui.dailyLogDaysDisplay.textContent = logsToShow.length;
+        }
+
+        function renderBalanceChart() {
+            const labels = gameData.balanceHistory.map(entry => `D${entry.day}`);
+            const data = gameData.balanceHistory.map(entry => entry.balance);
+
+            if (balanceChartInstance) balanceChartInstance.destroy();
+            balanceChartInstance = new Chart(ui.balanceChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Saldo da Loja', data: data,
+                        borderColor: '#4a69bb', backgroundColor: 'rgba(74, 105, 187, 0.1)',
+                        tension: 0.1, fill: true
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: false, ticks: { callback: value => formatCurrency(value) } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderMetasPage() {
+            ui.achievementsList.innerHTML = '';
+            gameData.achievements.forEach(ach => {
+                const config = achievementsConfig.find(c => c.id === ach.id);
+                if (!config) return;
+                let progressText = '';
+                 if (!ach.completed) {
+                    let currentVal = 0;
+                    let targetVal = config.target;
+                    switch(config.type) {
+                        case 'money': currentVal = gameData.money; break;
+                        case 'categories_unlocked':
+                            const unlockedCategories = new Set();
+                            gameData.products.filter(p => p.unlocked).forEach(p => unlockedCategories.add(p.category));
+                            currentVal = unlockedCategories.size;
+                            break;
+                        case 'employees_hired': currentVal = gameData.employees.length; break;
+                        case 'employee_type_hired': currentVal = gameData.employees.filter(e => e.typeId === config.targetTypeId).length; targetVal = 1; break;
+                        case 'reputation': currentVal = gameData.reputation; break;
+                        case 'total_profit': currentVal = gameData.totalProfit; break;
+                        case 'all_products_category':
+                            const prodsInCat = productCatalog.filter(p => p.category === config.targetCategory);
+                            const unlockedInCatCount = gameData.products.filter(p => p.category === config.targetCategory && p.unlocked).length;
+                            currentVal = unlockedInCatCount;
+                            targetVal = prodsInCat.length;
+                            break;
+                        case 'all_products_unlocked':
+                            currentVal = gameData.products.filter(p => p.unlocked).length;
+                            targetVal = productCatalog.length; // Already set in config or updated
+                            break;
+                        case 'marketing_tier': currentVal = gameData.marketingAgencyTier; break;
+                        case 'store_level': currentVal = gameData.storeUpgradeLevel; break;
+                        case 'total_stock_value': currentVal = gameData.currentTotalStockValue || 0; break;
+                        case 'days_passed': currentVal = gameData.day; break;
+                        case 'total_revenue': currentVal = gameData.totalRevenue; break;
+                        case 'marketing_campaigns_run': currentVal = gameData.marketingCampaignsRun; break;
+                        case 'bad_events_survived': currentVal = gameData.badEventsSurvived; break;
+                        case 'diversified_sales_day': /* Checked at end of day, value stored if met */ currentVal = ach.currentProgress || 0; break;
+                    }
+                    progressText = `(${typeof currentVal === 'number' ? currentVal.toFixed(config.type === 'reputation' ? 1:0) : currentVal} / ${targetVal})`;
+                }
+                
+                let rewardInfo = "Recompensa: ";
+                if (config.reward.money) rewardInfo += `${formatCurrency(config.reward.money)} `;
+                if (config.reward.reputation) rewardInfo += `+${config.reward.reputation} Rep `;
+                if (config.reward.permanentEffects) {
+                    config.reward.permanentEffects.forEach(eff => rewardInfo += `${eff.description} `);
+                }
+
+
+                ui.achievementsList.innerHTML += `
+                    <li class="achievement ${ach.completed ? 'completed' : ''}">
+                        <div>
+                            <strong>${config.name}</strong>
+                            <small>${config.description} ${ach.completed ? "(Concluído!)" : progressText}</small>
+                            ${!ach.completed ? `<small style="font-style:italic;">${rewardInfo.trim()}</small>`: ''}
+                            ${ach.completed && ach.rewardClaimed ? '<small style="color:green;">Recompensa Coletada!</small>' : ''}
+                        </div>
+                        ${ach.completed && !ach.rewardClaimed ? 
+                            `<button class="action-button claim-achievement-btn" data-achid="${ach.id}">Coletar</button>` : ''}
+                    </li>
+                `;
+            });
+            ui.achievementsList.querySelectorAll('.claim-achievement-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => handleClaimAchievement(e.target.dataset.achid));
+            });
+        }
+
+
+        // === FUNÇÕES DE LÓGICA DE JOGO (HANDLERS E SIMULAÇÃO) ===
+        function handlePageSwitch(pageId) {
+            ui.pages.forEach(page => page.classList.remove('active'));
+            ui.navTabs.forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            document.querySelector(`.nav-tab[data-page="${pageId}"]`).classList.add('active');
+            renderAllUI();
+        }
+
+        function handleBuyStock(productId, amount) {
+            const product = gameData.products.find(p => p.id === productId);
+            if (!product) return;
+            
+            let stockCostReduction = 0;
+            const estoquista = gameData.employees.find(emp => emp.typeId === 'estoquista');
+            if (estoquista) {
+                 const estoquistaType = employeeTypes.find(et => et.id === 'estoquista');
+                 stockCostReduction = estoquistaType.effectValue * estoquista.morale;
+            }
+            let effectiveBuyPrice = product.buyPrice * (gameData.eventModifiers.buy_price_multiplier || 1);
+            effectiveBuyPrice *= (1 - stockCostReduction);
+
+            const cost = effectiveBuyPrice * amount;
+
+            if (gameData.money >= cost) {
+                gameData.money -= cost;
+                product.stock += amount;
+                addLog(`Comprou ${amount} de ${product.name} por ${formatCurrency(cost)}.`, 'success');
+                renderAllUI();
+            } else {
+                addLog(`Dinheiro insuficiente para ${amount} de ${product.name}. Precisa: ${formatCurrency(cost)}.`, 'warning');
+            }
+        }
+
+        function handleUnlockProduct(productId) {
+            const product = gameData.products.find(p => p.id === productId);
+            if (!product || product.unlocked) return;
+            if (gameData.money >= product.unlockCost) {
+                gameData.money -= product.unlockCost;
+                product.unlocked = true;
+                addLog(`${product.name} desbloqueado por ${formatCurrency(product.unlockCost)}!`, 'success');
+                checkAchievements();
+                renderAllUI();
+            } else {
+                addLog(`Dinheiro insuficiente para desbloquear ${product.name}.`, 'warning');
+            }
+        }
+        
+        function handleUpgradeMarketingAgency() {
+            if (gameData.marketingAgencyTier < marketingAgencyTiers.length - 1) {
+                const nextTier = marketingAgencyTiers[gameData.marketingAgencyTier + 1];
+                if (gameData.money >= nextTier.cost) {
+                    gameData.money -= nextTier.cost;
+                    gameData.marketingAgencyTier++;
+                    addLog(`Agência de Marketing "${nextTier.name}" contratada por ${formatCurrency(nextTier.cost)}.`, 'success');
+                    checkAchievements();
+                    renderAllUI();
+                } else { addLog("Dinheiro insuficiente para contratar agência melhor.", 'warning'); }
+            }
+        }
+        function handleRunMarketingCampaign(campaignId) {
+            const campaign = marketingCampaigns.find(c => c.id === campaignId);
+            if (!campaign || gameData.activeMarketingCampaigns.some(ac => ac.id === campaign.id)) return;
+
+            const tier = marketingAgencyTiers[gameData.marketingAgencyTier];
+            let finalCost = campaign.baseCost * tier.campaignCostModifier;
+            // Assistente de marketing não afeta custo aqui, mas eficácia geral das campanhas
+
+            if (gameData.money >= finalCost) {
+                gameData.money -= finalCost;
+                gameData.activeMarketingCampaigns.push({
+                    id: campaign.id,
+                    durationRemaining: campaign.duration,
+                    originalEffects: JSON.parse(JSON.stringify(campaign.effects)) // Store original effects for reapplication
+                });
+                gameData.marketingCampaignsRun++;
+                addLog(`Campanha "${campaign.name}" iniciada por ${formatCurrency(finalCost)}.`, 'success');
+                checkAchievements();
+                renderAllUI();
+            } else {
+                addLog(`Dinheiro insuficiente para campanha "${campaign.name}".`, 'warning');
+            }
+        }
+
+
+        function handleUpgradeStore() {
+            if (gameData.storeUpgradeLevel < storeUpgrades.length - 1) {
+                const nextLevel = storeUpgrades[gameData.storeUpgradeLevel + 1];
+                if (gameData.money >= nextLevel.cost) {
+                    gameData.money -= nextLevel.cost;
+                    gameData.storeUpgradeLevel++;
+                    addLog(`Loja Nível ${gameData.storeUpgradeLevel} por ${formatCurrency(nextLevel.cost)}.`, 'success');
+                    checkAchievements();
+                    renderAllUI();
+                } else { addLog("Dinheiro insuficiente para melhorar loja.", 'warning'); }
+            }
+        }
+
+        function handleHireEmployee(typeId) {
+            const type = employeeTypes.find(t => t.id === typeId);
+            if (!type) return;
+            const currentOfType = gameData.employees.filter(emp => emp.typeId === type.id).length;
+            
+            if (currentOfType >= type.maxHirable) {
+                addLog(`Já atingiu o máximo de ${type.name}.`, 'warning');
+                return;
+            }
+            if (gameData.money >= type.hireCost) {
+                gameData.money -= type.hireCost;
+                gameData.employees.push({ 
+                    typeId: type.id, 
+                    uniqueId: `emp-${gameData.nextEmployeeUniqueId++}`,
+                    morale: BASE_MORALE 
+                });
+                addLog(`${type.name} contratado por ${formatCurrency(type.hireCost)}.`, 'success');
+                checkAchievements();
+                updateAllEmployeeMorale(); // Recalcular moral de todos
+                renderAllUI();
+            } else { addLog(`Dinheiro insuficiente para contratar ${type.name}.`, 'warning'); }
+        }
+
+        function handleFireEmployee(uniqueId) {
+            const empIndex = gameData.employees.findIndex(emp => emp.uniqueId === uniqueId);
+            if (empIndex === -1) return;
+            const employee = gameData.employees[empIndex];
+            const type = employeeTypes.find(et => et.id === employee.typeId);
+            const severancePay = type.salaryPerDay * 2; // Penalidade de demissão
+            if (gameData.money >= severancePay) {
+                gameData.money -= severancePay;
+                gameData.employees.splice(empIndex, 1);
+                addLog(`${type.name} #${employee.uniqueId} demitido. Custo: ${formatCurrency(severancePay)}.`, 'warning');
+                updateAllEmployeeMorale(); // Recalcular moral de todos
+                renderAllUI();
+            } else {
+                 addLog(`Dinheiro insuficiente para demitir ${type.name}. Precisa ${formatCurrency(severancePay)}.`, 'warning');
+            }
+        }
+        
+        function handleClaimAchievement(achievementId) {
+            const ach = gameData.achievements.find(a => a.id === achievementId);
+            const config = achievementsConfig.find(c => c.id === achievementId);
+            if (ach && config && ach.completed && !ach.rewardClaimed) {
+                if (config.reward.money) gameData.money += config.reward.money;
+                if (config.reward.reputation) updateReputation(config.reward.reputation);
+                if (config.reward.permanentEffects) {
+                    config.reward.permanentEffects.forEach(effect => {
+                        gameData.permanentEffects.push({...effect}); // Adiciona cópia do efeito
+                        addLog(`Efeito permanente ganho: ${effect.description}`, 'success');
+                    });
+                    applyPermanentEffects(); // Reaplicar imediatamente, se necessário
+                }
+                ach.rewardClaimed = true;
+                addLog(`Recompensa por "${config.name}" coletada!`, 'success');
+                renderAllUI();
+            }
+        }
+
+
+        function generateCustomerMessage(type, productName = null) {
+            let templatePool = customerMessageTemplates[type] || customerMessageTemplates.neutral;
+            if (type === 'positive_sale') templatePool = customerMessageTemplates.positive;
+
+            const messageText = getRandomElement(templatePool);
+            gameData.customerMessages.unshift({ type, text: messageText, productName });
+            if (gameData.customerMessages.length > MAX_CUSTOMER_MESSAGES) {
+                gameData.customerMessages.pop();
+            }
+        }
+        
+        function processActiveEvents() {
+            gameData.eventModifiers = { // Resetar modificadores de eventos
+                demand_multiplier: 1,
+                buy_price_multiplier: 1,
+                sale_conversion_multiplier: 1,
+                visitor_multiplier: 1,
+                specific_product_demand_multiplier: {}
+            };
+
+            gameData.activeEvents = gameData.activeEvents.filter(event => {
+                if (event.effectTarget === "demand") gameData.eventModifiers.demand_multiplier *= event.effectValue;
+                if (event.effectTarget === "buy_price") gameData.eventModifiers.buy_price_multiplier *= event.effectValue;
+                if (event.effectTarget === "sale_conversion") gameData.eventModifiers.sale_conversion_multiplier *= event.effectValue;
+                if (event.effectTarget === "visitor_multiplier") gameData.eventModifiers.visitor_multiplier *= event.effectValue;
+                if (event.effectTarget === "specific_product_demand") {
+                    if (!event.affectedProductId && event.needsProduct) {
+                        const eligibleProducts = gameData.products.filter(p => p.unlocked && p.stock > 0);
+                        if (eligibleProducts.length > 0) {
+                            event.affectedProductId = getRandomElement(eligibleProducts).id;
+                             addLog(`Evento "${event.name}" agora afeta ${gameData.products.find(p=>p.id === event.affectedProductId).name}.`, 'info');
+                        } else {
+                            addLog(`Evento "${event.name}" não encontrou produto elegível para afetar.`, 'info');
+                             event.durationRemaining = 0; 
+                        }
+                    }
+                    if (event.affectedProductId) {
+                        gameData.eventModifiers.specific_product_demand_multiplier[event.affectedProductId] = (gameData.eventModifiers.specific_product_demand_multiplier[event.affectedProductId] || 1) * event.effectValue;
+                    }
+                }
+                event.durationRemaining--;
+                if (event.durationRemaining <= 0) {
+                    addLog(`Evento "${event.name}" terminou.`);
+                    if (event.type === "bad") gameData.badEventsSurvived++;
+                    return false;
+                }
+                return true;
+            });
+
+            // Chance de novo evento aleatório
+            if (Math.random() < EVENT_CHANCE_PER_DAY && gameData.activeEvents.length < 3) {
+                const newEventConfig = { ...getRandomElement(randomEventsPool) };
+                 if (!gameData.activeEvents.find(ae => ae.id === newEventConfig.id)) {
+                    newEventConfig.durationRemaining = newEventConfig.duration;
+                    if (newEventConfig.isInstant) {
+                        addLog(`Evento Instantâneo: ${newEventConfig.description}`, newEventConfig.type === 'good' ? 'success' : 'warning');
+                        if (newEventConfig.effectTarget === "reputation") updateReputation(newEventConfig.effectValue);
+                        if (newEventConfig.type === "bad" && !newEventConfig.isInstant) gameData.badEventsSurvived++; // Contabiliza mesmo que seja instantâneo
+                    } else {
+                        gameData.activeEvents.push(newEventConfig);
+                        addLog(`Novo Evento: ${newEventConfig.name}! ${newEventConfig.description}`, newEventConfig.type === 'good' ? 'success' : 'warning');
+                        if (newEventConfig.secondaryEffectTarget === "reputation" && newEventConfig.secondaryEffectValue) {
+                            updateReputation(newEventConfig.secondaryEffectValue);
+                        }
+                    }
+                }
+            }
+        }
+
+        function processActiveMarketingCampaigns() {
+            // Modificadores de campanha são resetados e reaplicados a cada dia
+            gameData.campaignModifiers = {
+                visitor_multiplier_temp: 1,
+                demand_multiplier_temp: 1,
+                sale_conversion_temp: 1,
+                reputation_temp_boost: 0,
+                // Modificadores por categoria precisam ser tratados separadamente
+                category_demand_multipliers_temp: {} // { "Snacks": 1.1, "Roupas": 1.05 }
+            };
+
+            const agencyTier = marketingAgencyTiers[gameData.marketingAgencyTier];
+            let marketingAssistantBoost = 1;
+            gameData.employees.forEach(emp => {
+                if (emp.typeId === 'marketing_as') {
+                    const empType = employeeTypes.find(et => et.id === emp.typeId);
+                    marketingAssistantBoost += (empType.effectValue * emp.morale);
+                }
+            });
+            
+            const overallEffectiveness = agencyTier.campaignEffectiveness * marketingAssistantBoost;
+
+            gameData.activeMarketingCampaigns = gameData.activeMarketingCampaigns.filter(activeCampaign => {
+                const campaignConfig = marketingCampaigns.find(c => c.id === activeCampaign.id);
+                if (!campaignConfig) return false;
+
+                activeCampaign.originalEffects.forEach(effect => { // Use originalEffects to re-calculate based on current overallEffectiveness
+                    let effectiveValue = effect.value;
+                    if (effect.type !== "reputation_temp_boost" && effect.type !== "reputation_perm_boost_on_finish") { // Boosts não são multiplicados
+                        effectiveValue = 1 + ((effect.value - 1) * overallEffectiveness); // Aplicar boost de eficácia
+                    } else if (effect.type === "reputation_temp_boost") {
+                        effectiveValue = effect.value * overallEffectiveness; // Rep boost é aditivo, mas sua magnitude pode ser afetada
+                    }
+
+
+                    if (effect.targetCategories && effect.targetCategories.length > 0) {
+                        effect.targetCategories.forEach(cat => {
+                            if (!gameData.campaignModifiers.category_demand_multipliers_temp[cat]) {
+                                gameData.campaignModifiers.category_demand_multipliers_temp[cat] = 1;
+                            }
+                            if (effect.type === "demand_multiplier_temp") {
+                                gameData.campaignModifiers.category_demand_multipliers_temp[cat] *= effectiveValue;
+                            }
+                        });
+                    } else {
+                        if (gameData.campaignModifiers[effect.type] !== undefined) {
+                            if (effect.type === "reputation_temp_boost") {
+                                gameData.campaignModifiers[effect.type] += effectiveValue;
+                            } else {
+                                gameData.campaignModifiers[effect.type] *= effectiveValue;
+                            }
+                        }
+                    }
+                });
+                
+                activeCampaign.durationRemaining--;
+                if (activeCampaign.durationRemaining <= 0) {
+                    addLog(`Campanha de Marketing "${campaignConfig.name}" terminou.`);
+                    // Aplicar efeitos de final de campanha
+                    campaignConfig.effects.forEach(effect => {
+                        if (effect.type === "reputation_perm_boost_on_finish") {
+                             const finalRepBoost = effect.value * overallEffectiveness;
+                             updateReputation(finalRepBoost);
+                             addLog(`Campanha "${campaignConfig.name}" concedeu +${finalRepBoost.toFixed(2)} Reputação Permanente.`, 'success');
+                        }
+                    });
+                    return false; // Remove campanha
+                }
+                return true; // Mantém campanha
+            });
+            if (gameData.campaignModifiers.reputation_temp_boost !== 0) {
+                updateReputation(gameData.campaignModifiers.reputation_temp_boost); // Aplica boost de reputação diário
+            }
+        }
+        
+        function updateAllEmployeeMorale() {
+            const hasManager = gameData.employees.some(e => e.typeId === 'gerente_loja');
+            const managerBonus = hasManager ? employeeTypes.find(et => et.id === 'gerente_loja').effectValue : 0; // O efeito do gerente é +10% moral, ou seja, 0.1
+
+            gameData.employees.forEach(emp => {
+                let moraleChange = 0;
+                // Reputação da loja
+                if (gameData.reputation >= 4) moraleChange += 0.05;
+                else if (gameData.reputation < 2) moraleChange -= 0.05;
+
+                // Gerente (se não for o próprio gerente)
+                if (emp.typeId !== 'gerente_loja' && hasManager) {
+                     const manager = gameData.employees.find(e => e.typeId === 'gerente_loja');
+                     if (manager) moraleChange += (managerBonus * manager.morale); // Efeito do gerente é afetado pela moral DELE
+                }
+                
+                // Simples "pagamento" estabiliza, mas não aumenta muito.
+                // Se não houver mudanças negativas, a moral tende a voltar para BASE_MORALE lentamente.
+                if (moraleChange === 0 && emp.morale < BASE_MORALE) moraleChange = 0.01; // Ligeira recuperação se nada ruim acontece
+                else if (moraleChange === 0 && emp.morale > BASE_MORALE) moraleChange = -0.005; // Ligeira normalização se muito alta
+
+                emp.morale = parseFloat((emp.morale + moraleChange).toFixed(3));
+                emp.morale = Math.max(MIN_MORALE, Math.min(MAX_MORALE, emp.morale));
+            });
+        }
+
+
+        function checkAchievements() {
+            achievementsConfig.forEach(config => {
+                let ach = gameData.achievements.find(a => a.id === config.id);
+                if (!ach || ach.completed) return;
+                let conditionMet = false;
+                let currentVal; // Para o progresso
+                switch(config.type) {
+                    case 'money': conditionMet = gameData.money >= config.target; currentVal = gameData.money; break;
+                    case 'categories_unlocked':
+                        const unlockedCategories = new Set();
+                        gameData.products.filter(p => p.unlocked).forEach(p => unlockedCategories.add(p.category));
+                        conditionMet = unlockedCategories.size >= config.target; currentVal = unlockedCategories.size;
+                        break;
+                    case 'employees_hired': conditionMet = gameData.employees.length >= config.target; currentVal = gameData.employees.length; break;
+                    case 'employee_type_hired': 
+                        conditionMet = gameData.employees.some(e => e.typeId === config.targetTypeId); currentVal = conditionMet ? 1 : 0;
+                        break;
+                    case 'reputation': conditionMet = gameData.reputation >= config.target; currentVal = gameData.reputation; break;
+                    case 'total_profit': conditionMet = gameData.totalProfit >= config.target; currentVal = gameData.totalProfit; break;
+                    case 'all_products_category':
+                        const prodsInCat = productCatalog.filter(p => p.category === config.targetCategory);
+                        const unlockedInCatCount = gameData.products.filter(p => p.category === config.targetCategory && p.unlocked).length;
+                        conditionMet = prodsInCat.length > 0 && unlockedInCatCount === prodsInCat.length;
+                        currentVal = unlockedInCatCount;
+                        break;
+                     case 'all_products_unlocked':
+                        const totalUnlocked = gameData.products.filter(p => p.unlocked).length;
+                        conditionMet = totalUnlocked >= productCatalog.length;
+                        currentVal = totalUnlocked;
+                        break;
+                    case 'marketing_tier': conditionMet = gameData.marketingAgencyTier >= config.target; currentVal = gameData.marketingAgencyTier; break;
+                    case 'store_level': conditionMet = gameData.storeUpgradeLevel >= config.target; currentVal = gameData.storeUpgradeLevel; break;
+                    case 'total_stock_value': conditionMet = (gameData.currentTotalStockValue || 0) >= config.target; currentVal = gameData.currentTotalStockValue || 0; break;
+                    case 'days_passed': conditionMet = gameData.day >= config.target; currentVal = gameData.day; break;
+                    case 'total_revenue': conditionMet = gameData.totalRevenue >= config.target; currentVal = gameData.totalRevenue; break;
+                    case 'marketing_campaigns_run': conditionMet = gameData.marketingCampaignsRun >= config.target; currentVal = gameData.marketingCampaignsRun; break;
+                    case 'bad_events_survived': conditionMet = gameData.badEventsSurvived >= config.target; currentVal = gameData.badEventsSurvived; break;
+                    case 'diversified_sales_day':
+                        // Essa é verificada e atualizada no final do dia em simulateDay
+                        conditionMet = (ach.currentProgress || 0) >= config.target;
+                        currentVal = ach.currentProgress || 0;
+                        break;
+                }
+                if (ach && !ach.completed) ach.currentProgress = currentVal; // Salva progresso para exibição
+
+                if (conditionMet && ach && !ach.completed) {
+                    ach.completed = true;
+                    addLog(`Meta Alcançada: ${config.name}! Colete sua recompensa.`, 'success');
+                }
+            });
+        }
+
+        function simulateDay() {
+            gameData.day++;
+            gameData.financesToday = { revenue: 0, cogs: 0, salaries: 0, fixedCosts: 0 };
+            gameData.productsSoldTodayByCategory = {}; // Reset for achievement
+            addLog(`--- DIA ${gameData.day} ---`, 'day-separator');
+
+            applyPermanentEffects(); // Aplica bônus permanentes
+            processActiveEvents();
+            processActiveMarketingCampaigns();
+            updateAllEmployeeMorale();
+
+            let salesRevenue = 0;
+            let costOfGoodsSold = 0;
+            let successfulSalesCount = 0;
+            let attemptedSalesNoStock = 0;
+            
+            // Modificadores de funcionário
+            let globalEmployeeSaleConversionBoost = 0;
+            let globalEmployeeDemandBoost = 1;
+            let globalEmployeeMarketingBoost = 1; // Afeta eficácia de campanhas, já usado em processActiveMarketingCampaigns
+            let globalEmployeeStockCostReduction = 0; // Usado em handleBuyStock e COGS
+            let globalOverallEfficiencyBoost = 1; // Do gerente
+
+            gameData.employees.forEach(emp => {
+                const type = employeeTypes.find(et => et.id === emp.typeId);
+                if (type) {
+                    const effectiveMorale = emp.morale; // Moral já calculada
+                    if (type.effectType === "sale_conversion_boost") globalEmployeeSaleConversionBoost += (type.effectValue * effectiveMorale);
+                    if (type.effectType === "demand_boost") globalEmployeeDemandBoost *= (1 + (type.effectValue * effectiveMorale)); // Vendedores Pl e Sênior teriam isso
+                    // marketing_effectiveness_boost já foi usado.
+                    if (type.effectType === "stock_cost_reduction") globalEmployeeStockCostReduction += (type.effectValue * effectiveMorale); // Estoquista
+                    if (type.effectType === "overall_efficiency_boost") globalOverallEfficiencyBoost *= (1 + (type.effectValue * effectiveMorale)); // Gerente
+                }
+            });
+
+
+            gameData.products.forEach(product => {
+                if (!product.unlocked || product.stock <= 0) return;
+
+                const agencyTier = marketingAgencyTiers[gameData.marketingAgencyTier];
+                // const marketingMultiplier = agencyTier.campaignEffectiveness; // Substituído por campaignModifiers
+                const storeMultiplier = storeUpgrades[gameData.storeUpgradeLevel].effect;
+                const reputationMultiplier = 0.7 + (gameData.reputation / MAX_REPUTATION) * 0.6;
+
+                let permVisitorBoost = 1;
+                gameData.permanentEffects.forEach(eff => {
+                    if(eff.type === "visitor_multiplier_perm") permVisitorBoost *= eff.value;
+                });
+                
+                let potentialVisitors = product.potentialVisitorsBase *
+                                        reputationMultiplier *
+                                        (gameData.eventModifiers.visitor_multiplier || 1) *
+                                        (gameData.campaignModifiers.visitor_multiplier_temp || 1) *
+                                        globalEmployeeDemandBoost *
+                                        globalOverallEfficiencyBoost * // Gerente afeta visitantes também
+                                        permVisitorBoost;
+
+
+                // Modificador de demanda geral e específico do produto (eventos e campanhas)
+                potentialVisitors *= (gameData.eventModifiers.demand_multiplier || 1);
+                potentialVisitors *= (gameData.campaignModifiers.demand_multiplier_temp || 1);
+                
+                // Demanda por categoria de campanhas
+                if (gameData.campaignModifiers.category_demand_multipliers_temp && gameData.campaignModifiers.category_demand_multipliers_temp[product.category]) {
+                    potentialVisitors *= gameData.campaignModifiers.category_demand_multipliers_temp[product.category];
+                }
+                // Demanda específica de evento
+                if (gameData.eventModifiers.specific_product_demand_multiplier[product.id]) {
+                    potentialVisitors *= gameData.eventModifiers.specific_product_demand_multiplier[product.id];
+                }
+                potentialVisitors = Math.floor(potentialVisitors);
+
+
+                for (let i = 0; i < potentialVisitors; i++) {
+                    if (Math.random() > product.baseDemand) continue;
+
+                    if (product.stock > 0) {
+                        const baseConversion = 0.25;
+                        const finalConversionChance = Math.min(0.95,
+                            (baseConversion + globalEmployeeSaleConversionBoost) *
+                            storeMultiplier *
+                            (gameData.eventModifiers.sale_conversion_multiplier || 1) *
+                            (gameData.campaignModifiers.sale_conversion_temp || 1) *
+                            globalOverallEfficiencyBoost * // Gerente afeta conversão
+                            (gameData.activeEvents.find(ev => ev.id === 'seasonal_rush' && ev.secondaryEffectTarget === 'sale_conversion')?.secondaryEffectValue || 1)
+                        );
+
+                        if (Math.random() < finalConversionChance) {
+                            product.stock--;
+                            const salePrice = product.sellPrice;
+                            salesRevenue += salePrice;
+                            costOfGoodsSold += (product.buyPrice * (gameData.eventModifiers.buy_price_multiplier || 1)) * (1-globalEmployeeStockCostReduction); // Custo de compra também reduzido por estoquista aqui para COGS
+                            successfulSalesCount++;
+                            if (Math.random() < 0.08) updateReputation(0.03);
+
+                            // Para achievement 'diversified_sales_day'
+                            if (!gameData.productsSoldTodayByCategory[product.category]) {
+                                gameData.productsSoldTodayByCategory[product.category] = 0;
+                            }
+                            gameData.productsSoldTodayByCategory[product.category]++;
+
+                        }
+                    } else {
+                        attemptedSalesNoStock++;
+                        let repLoss = -0.06;
+                        // Estoquista reduz penalidade de reputação por falta de estoque
+                        if (gameData.employees.some(e => e.typeId === 'estoquista')) repLoss *= 0.5;
+                        if (Math.random() < 0.10) updateReputation(repLoss);
+                        break; 
+                    }
+                }
+            });
+
+            // Mensagens de clientes (lógica mantida)
+            if (successfulSalesCount > 0) {
+                if (Math.random() < CUSTOMER_MESSAGE_CHANCE_PER_DAY * 0.7) { 
+                    generateCustomerMessage('positive_sale', getRandomElement(gameData.products.filter(p=>p.unlocked)).name);
+                }
+            }
+            if (attemptedSalesNoStock > 0) {
+                addLog(`${attemptedSalesNoStock} tentativa(s) de compra sem estoque!`, 'warning');
+                if (Math.random() < CUSTOMER_MESSAGE_CHANCE_PER_DAY * 0.5) {
+                     generateCustomerMessage('negative_stock', getRandomElement(gameData.products.filter(p=>p.unlocked)).name);
+                }
+            }
+            if (successfulSalesCount === 0 && Math.random() < CUSTOMER_MESSAGE_CHANCE_PER_DAY * 0.3) {
+                if (gameData.reputation < 2.0 && Math.random() < 0.6) {
+                     generateCustomerMessage('negative_general');
+                } else {
+                    generateCustomerMessage('neutral');
+                }
+            }
+
+            gameData.totalRevenue += salesRevenue;
+            gameData.financesToday.revenue = salesRevenue;
+            gameData.financesToday.cogs = costOfGoodsSold;
+
+            const profitFromSales = salesRevenue - costOfGoodsSold;
+            gameData.totalProfit += profitFromSales; // Lucro apenas das vendas, antes de outras despesas
+            gameData.money += salesRevenue; // Dinheiro entra das vendas
+            if (salesRevenue > 0) addLog(`Vendas: ${formatCurrency(salesRevenue)}. CMV: ${formatCurrency(costOfGoodsSold)}. ${successfulSalesCount} itens.`, 'info');
+
+            let totalSalaries = 0;
+            gameData.employees.forEach(emp => {
+                const type = employeeTypes.find(et => et.id === emp.typeId);
+                if (type) totalSalaries += type.salaryPerDay;
+            });
+            gameData.financesToday.salaries = totalSalaries;
+            
+            const totalFixed = calculateTotalFixedCosts();
+            gameData.financesToday.fixedCosts = totalFixed;
+            
+            const totalDailyOperatingExpenses = totalSalaries + totalFixed;
+            gameData.money -= totalDailyOperatingExpenses; // Dinheiro sai para despesas operacionais
+            if (totalDailyOperatingExpenses > 0) addLog(`Despesas: Salários ${formatCurrency(totalSalaries)}, Custos Fixos ${formatCurrency(totalFixed)}.`, 'info');
+            
+            // Guardar log financeiro do dia
+            gameData.dailyFinancialLogs.push({...gameData.financesToday, day: gameData.day });
+            if (gameData.dailyFinancialLogs.length > MAX_BALANCE_HISTORY * 2) { // Manter um log um pouco maior que o do gráfico
+                gameData.dailyFinancialLogs.shift();
+            }
+
+            if (gameData.money < 0 && Math.abs(gameData.money) > INITIAL_MONEY * 0.6) {
+                addLog("ALERTA: Dívidas aumentando! Risco de falência!", 'error');
+                updateReputation(-0.25);
+                gameData.employees.forEach(emp => emp.morale = Math.max(MIN_MORALE, emp.morale - 0.1)); // Dívida afeta moral
+            }
+
+            gameData.balanceHistory.push({ day: gameData.day, balance: gameData.money });
+            if (gameData.balanceHistory.length > MAX_BALANCE_HISTORY) gameData.balanceHistory.shift();
+            
+            // Achievement: diversified_sales_day
+            const categoriesSoldToday = Object.keys(gameData.productsSoldTodayByCategory).length;
+            const achDiversified = gameData.achievements.find(a => a.id === 'diversified_sales_day');
+            if (achDiversified && !achDiversified.completed) {
+                achDiversified.currentProgress = categoriesSoldToday; // Atualiza o progresso para exibição
+            }
+
+
+            checkAchievements();
+            saveGame();
+            renderAllUI();
+
+            if (gameData.money < -INITIAL_MONEY * 1.8 && gameData.day > 7) {
+                gameOver();
+            }
+        }
+        
+        function gameOver() {
+            clearInterval(gameLoopIntervalId);
+            addLog("GAME OVER! Sua loja faliu. Dívidas excessivas.", "error");
+            alert("GAME OVER! Sua loja faliu devido a dívidas excessivas. Pressione 'Resetar Jogo' para tentar novamente.");
+            ui.navTabs.forEach(tab => tab.style.pointerEvents = 'none');
+            document.querySelectorAll('button:not(#reset-game)').forEach(btn => btn.disabled = true);
+        }
+
+        // === INICIALIZAÇÃO E PERSISTÊNCIA ===
+        function getDefaultGameData() {
+            const initialAchievements = achievementsConfig.map(ach => ({ 
+                id: ach.id, 
+                completed: false, 
+                rewardClaimed: false,
+                currentProgress: 0 // Para conquistas com progresso visível
+            }));
+            const achUnlockAllDefault = initialAchievements.find(a => a.id === "unlock_all_products");
+            if (achUnlockAllDefault) achUnlockAllDefault.target = productCatalog.length; // Garante target dinâmico
+
+            return {
+                money: INITIAL_MONEY, reputation: INITIAL_REPUTATION, day: 0,
+                products: JSON.parse(JSON.stringify(productCatalog.map(p => ({...p, stock: p.unlocked ? Math.floor(p.potentialVisitorsBase / 3) : 0})))),
+                storeUpgradeLevel: 0,
+                marketingAgencyTier: 0, // Nova propriedade
+                activeMarketingCampaigns: [], // Nova propriedade
+                marketingCampaignsRun: 0, // Para achievement
+                employees: [], nextEmployeeUniqueId: 1,
+                activeEvents: [],
+                eventModifiers: { demand_multiplier: 1, buy_price_multiplier: 1, sale_conversion_multiplier: 1, visitor_multiplier: 1, specific_product_demand_multiplier: {} },
+                campaignModifiers: { visitor_multiplier_temp: 1, demand_multiplier_temp: 1, sale_conversion_temp: 1, reputation_temp_boost: 0, category_demand_multipliers_temp: {} },
+                logMessages: [], customerMessages: [],
+                achievements: initialAchievements, 
+                totalProfit: 0, totalRevenue: 0, badEventsSurvived: 0,
+                balanceHistory: [{ day: 0, balance: INITIAL_MONEY }],
+                financesToday: { revenue: 0, cogs: 0, salaries: 0, fixedCosts: 0 },
+                dailyFinancialLogs: [], // Novo para histórico financeiro
+                currentTotalStockValue: 0,
+                productsSoldTodayByCategory: {},
+                permanentEffects: [], // Para recompensas de achievements
+            };
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('lojaManagerMaxData_v4'); // Nova chave para nova estrutura
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    const defaultData = getDefaultGameData();
+                    
+                    // Merge products (mantido)
+                    const mergedProducts = defaultData.products.map(catProd => {
+                        const savedProd = parsed.products ? parsed.products.find(p => p.id === catProd.id) : null;
+                        return savedProd ? { ...catProd, ...savedProd } : catProd;
+                    });
+                    if(parsed.products){ productCatalog.forEach(catProd => { if (!parsed.products.find(p => p.id === catProd.id)) { const newP = defaultData.products.find(dp => dp.id === catProd.id); if(newP) parsed.products.push(newP); } });
+                    } else { parsed.products = mergedProducts; }
+
+                    // Merge achievements (mais robusto)
+                    const mergedAchievements = defaultData.achievements.map(defAch => {
+                        const savedAch = parsed.achievements ? parsed.achievements.find(sa => sa.id === defAch.id) : null;
+                        if (savedAch) { // Se ach salvo existe, usa ele mas atualiza target se necessário
+                            const cfgAch = achievementsConfig.find(ca => ca.id === defAch.id);
+                            if (cfgAch && cfgAch.target && cfgAch.type === "all_products_unlocked") savedAch.target = productCatalog.length; // Exemplo de atualização de target
+                            return { ...defAch, ...savedAch };
+                        }
+                        return defAch; // Senão, usa o default
+                    });
+                     // Adicionar novas conquistas do config que não estão no save
+                    achievementsConfig.forEach(cfgAch => {
+                        if (!mergedAchievements.find(ma => ma.id === cfgAch.id)) {
+                            const newAchFromDefaults = defaultData.achievements.find(da => da.id === cfgAch.id);
+                            if (newAchFromDefaults) mergedAchievements.push(newAchFromDefaults);
+                        }
+                    });
+                    parsed.achievements = mergedAchievements;
+
+
+                    gameData = { ...defaultData, ...parsed };
+                    // Garantir que todas as propriedades aninhadas/novas existam
+                    gameData.marketingAgencyTier = parsed.marketingAgencyTier !== undefined ? parsed.marketingAgencyTier : defaultData.marketingAgencyTier;
+                    gameData.activeMarketingCampaigns = parsed.activeMarketingCampaigns || defaultData.activeMarketingCampaigns;
+                    gameData.marketingCampaignsRun = parsed.marketingCampaignsRun || defaultData.marketingCampaignsRun;
+                    gameData.campaignModifiers = parsed.campaignModifiers || defaultData.campaignModifiers;
+                    gameData.dailyFinancialLogs = parsed.dailyFinancialLogs || defaultData.dailyFinancialLogs;
+                    gameData.totalRevenue = parsed.totalRevenue || defaultData.totalRevenue;
+                    gameData.badEventsSurvived = parsed.badEventsSurvived || defaultData.badEventsSurvived;
+                    gameData.productsSoldTodayByCategory = parsed.productsSoldTodayByCategory || defaultData.productsSoldTodayByCategory;
+                    gameData.permanentEffects = parsed.permanentEffects || defaultData.permanentEffects;
+                    
+                    // Assegurar que funcionários tenham moral
+                    gameData.employees = gameData.employees.map(emp => ({ ...emp, morale: emp.morale || BASE_MORALE }));
+
+
+                    addLog("Jogo carregado!", "success");
+                    return true;
+                } catch (e) {
+                    console.error("Erro ao carregar save:", e);
+                    localStorage.removeItem('lojaManagerMaxData_v4');
+                }
+            }
+            return false;
+        }
+
+        function saveGame() {
+            localStorage.setItem('lojaManagerMaxData_v4', JSON.stringify(gameData));
+        }
+
+        function resetGameConfirm() {
+            if (confirm("Tem certeza que quer resetar TODO o progresso? Isso é irreversível!")) {
+                localStorage.removeItem('lojaManagerMaxData_v4');
+                if (gameLoopIntervalId) clearInterval(gameLoopIntervalId);
+                initGame();
+                addLog("Jogo resetado.", "warning");
+                ui.navTabs.forEach(tab => tab.style.pointerEvents = 'auto');
+                document.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            }
+        }
+        
+        function initEventListeners() {
+            ui.navTabs.forEach(tab => {
+                tab.addEventListener('click', () => handlePageSwitch(tab.dataset.page));
+            });
+            ui.resetGameBtn.addEventListener('click', resetGameConfirm);
+        }
+
+        function initGame() {
+            if (!loadGame()) {
+                gameData = getDefaultGameData();
+                addLog("Bem-vindo ao Loja Manager Simulator MAX!", "info");
+            }
+            // Recalcular targets dinâmicos para conquistas caso não tenham sido setados corretamente no load
+            const achUnlockAll = gameData.achievements.find(a => a.id === "unlock_all_products");
+            if (achUnlockAll) achUnlockAll.target = productCatalog.length;
+
+
+            initEventListeners();
+            applyPermanentEffects(); // Aplicar efeitos permanentes no início
+            handlePageSwitch('loja'); 
+            renderAllUI(); // Renderiza uma vez antes do loop para garantir que tudo esteja ok
+            
+            if (gameLoopIntervalId) clearInterval(gameLoopIntervalId);
+            gameLoopIntervalId = setInterval(simulateDay, GAME_TICK_INTERVAL);
+        }
+
+        document.addEventListener('DOMContentLoaded', initGame);
+
+    </script>
+</body>
+</html>
