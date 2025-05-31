@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHEXIA AI Chat (Versão Alpha)</title>
+    <style>
+        :root {
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            --modal-overlay-bg: rgba(0,0,0,0.7);
+            --code-bg-base: #1e1e1e;
+        }
+        body, :root {
+            --bg-color: #202123; --sidebar-bg: #202123; --chat-bg: #343541;
+            --input-bg: #40414F; --border-color: #4d4f5c; --text-color: #ececf1;
+            --text-secondary-color: #8e8ea0; --accent-color: #10a37f; --hover-bg: #2a2b32;
+            --danger-color: #c74646; --danger-hover-bg: #b33f3f;
+            --code-bg: var(--code-bg-base);
+            --modal-content-bg: #2a2b32;
+            --blockquote-bg: rgba(255,255,255,0.03);
+            --table-th-bg: rgba(255,255,255,0.05);
+            --scrollbar-thumb: #555c64;
+            --scrollbar-thumb-hover: #6b727c;
+            --button-default-bg: transparent;
+            --button-default-border: var(--border-color);
+            --button-default-text: var(--text-color);
+            --button-default-hover-bg: var(--hover-bg);
+            --info-bg: rgba(255, 255, 255, 0.05);
+            --info-border: rgba(255, 255, 255, 0.1);
+        }
+        body.light-theme, :root.light-theme {
+            --bg-color: #f0f2f5; --sidebar-bg: #f0f2f5; --chat-bg: #ffffff;
+            --input-bg: #f0f2f5; --border-color: #d1d5db; --text-color: #1f2937;
+            --text-secondary-color: #6b7280; --accent-color: #059669; --hover-bg: #e5e7eb;
+            --danger-color: #dc2626; --danger-hover-bg: #b91c1c;
+            --code-bg: #f3f4f6;
+            --modal-content-bg: #ffffff;
+            --blockquote-bg: #f9fafb;
+            --table-th-bg: #f3f4f6;
+            --scrollbar-thumb: #a0aec0;
+            --scrollbar-thumb-hover: #718096;
+            --button-default-bg: #e5e7eb;
+            --button-default-border: #c5c9cf;
+            --button-default-text: var(--text-color);
+            --button-default-hover-bg: #d1d5db;
+            --info-bg: rgba(0, 0, 0, 0.03);
+            --info-border: rgba(0, 0, 0, 0.08);
+        }
+        html, body { box-sizing: border-box; }
+        *, *:before, *:after { box-sizing: inherit; }
+        body {
+            font-family: var(--font-family); margin: 0; background-color: var(--bg-color);
+            color: var(--text-color); display: flex; height: 100vh; width: 100vw;
+            overflow: hidden; transition: background-color 0.3s, color 0.3s;
+        }
+        .chat-app-container { display: flex; width: 100%; height: 100%; overflow: hidden; }
+        .sidebar {
+            width: 260px; background-color: var(--sidebar-bg); padding: 12px;
+            display: flex; flex-direction: column; border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            transition: width 0.3s ease, padding 0.3s ease, transform 0.3s ease, background-color 0.3s, border-color 0.3s;
+            flex-shrink: 0; z-index: 1001;
+        }
+        .sidebar.collapsed { width: 0; padding: 12px 0; overflow: hidden; border-right: none; }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed; top: 0; left: 0; height: 100%; width: 260px; padding: 12px;
+                transform: translateX(-100%); box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+                border-right: 1px solid var(--border-color); /* Mantido para quando aberto */
+            }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar.collapsed { transform: translateX(-100%); width: 260px; padding: 12px; /* Garante que 'collapsed' no mobile também esconda */ }
+        }
+        .sidebar-button {
+            background-color: var(--button-default-bg); color: var(--button-default-text); border: 1px solid var(--button-default-border);
+            padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em;
+            text-align: left; display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s; white-space: nowrap;
+        }
+        .sidebar-button:hover { background-color: var(--hover-bg); color: var(--accent-color); border-color: var(--accent-color); }
+        .sidebar-button svg { width: 18px; height: 18px; flex-shrink: 0; fill: currentColor; }
+        #userMemoryInfo, #suggestedPersonaInfo {
+            font-size: 0.8em; color: var(--text-secondary-color);
+            padding: 10px 15px; margin-bottom: 10px; border: 1px dashed var(--border-color);
+            border-radius: 6px; line-height: 1.5;
+        }
+        #userMemoryInfo strong, #suggestedPersonaInfo strong { color: var(--text-color); }
+        #userMemoryInfo a, #suggestedPersonaInfo a { color: var(--accent-color); text-decoration: underline; cursor: pointer;}
+        #userMemoryInfo a:hover, #suggestedPersonaInfo a:hover { text-decoration: none; }
+        #suggestedPersonaInfo button {
+            background-color: var(--accent-color); color: white; border: none;
+            padding: 5px 10px; font-size: 0.9em; border-radius: 4px; cursor: pointer; margin-left: 6px; margin-top: 4px;
+        }
+        #suggestedPersonaInfo button:hover { opacity: 0.9; }
+        #promptLibraryBtn { margin-top: auto; }
+        #configureApiKeyBtn { margin-top: 8px; }
+        #clearAllConversationsBtn { color: var(--danger-color); border-color: var(--danger-color); margin-top: 8px; background-color: transparent; }
+        #clearAllConversationsBtn:hover { background-color: var(--danger-hover-bg); color: var(--bg-color); border-color: var(--danger-hover-bg); }
+        #conversationList { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; margin-top:8px;}
+        #conversationList li {
+            display: flex; justify-content: space-between; align-items: center; padding: 10px 15px;
+            border-radius: 8px; cursor: pointer; font-size: 0.9em; margin-bottom: 6px;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s, border-left 0.2s, padding-left 0.2s;
+            border: 1px solid transparent; position: relative; border-left: 4px solid transparent;
+        }
+        #conversationList li .conv-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; margin-right: 8px; }
+        #conversationList li .conv-persona { font-size: 0.75em; color: var(--text-secondary-color); margin-left: 5px; background-color: var(--input-bg); padding: 2px 6px; border-radius: 4px; white-space: nowrap; transition: background-color 0.3s, color 0.3s; }
+        #conversationList li:hover { background-color: var(--hover-bg); border-left-color: var(--accent-color); }
+        #conversationList li.active {
+            background-color: var(--accent-color); color: white; font-weight: 600;
+            border-left: 4px solid color-mix(in srgb, currentColor 40%, transparent);
+            padding-left: 11px;
+        }
+        body.light-theme #conversationList li.active .conv-persona { color: color-mix(in srgb, white 80%, var(--accent-color)); background-color: color-mix(in srgb, var(--accent-color) 85%, white); }
+        .delete-conv-btn {
+            background: none; border: none; color: var(--text-secondary-color); cursor: pointer;
+            padding: 4px; display: none; position: absolute; right: 10px; top: 50%;
+            transform: translateY(-50%); opacity: 0.7;
+        }
+        #conversationList li:hover .delete-conv-btn { display: inline-flex; }
+        #conversationList li.active .delete-conv-btn { color: white; opacity: 0.8; }
+        .delete-conv-btn:hover { color: var(--danger-color); opacity: 1; }
+        #conversationList li.active .delete-conv-btn:hover { color: color-mix(in srgb, var(--danger-color) 70%, white); }
+        .delete-conv-btn svg { width: 14px; height: 14px; fill: currentColor;}
+        .main-chat-area { flex-grow: 1; display: flex; flex-direction: column; background-color: var(--chat-bg); overflow: hidden; transition: background-color 0.3s; }
+        .chat-header {
+            padding: 12px 20px; background-color: var(--chat-bg); display: flex; align-items: center;
+            flex-shrink: 0; min-height: 50px; box-sizing: border-box; border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s, border-color 0.3s; position: relative;
+        }
+        #toggleSidebarBtn {
+            background: none; border: none; color: var(--text-secondary-color); cursor: pointer;
+            padding: 5px; margin-right: 10px; display: none; /* Escondido por padrão, mostrado por media query */
+        }
+        #toggleSidebarBtn svg {
+            width: 24px; /* Tamanho do ícone de menu */
+            height: 24px; /* Tamanho do ícone de menu */
+            fill: currentColor;
+        }
+        .chat-title-container { display: flex; align-items: center; justify-content: center; flex: 1; overflow: hidden; }
+        .chat-header h1 {
+            margin: 0; font-size: 1.0em; font-weight: 500; color: var(--text-color);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s;
+        }
+        .chat-header .persona-indicator {
+            font-size: 0.75em; color: var(--text-secondary-color); font-style: italic;
+            transition: color 0.3s; white-space: nowrap; margin-left: 8px; flex-shrink: 0;
+        }
+        #headerThemeToggleBtn {
+            background: none; border: none; color: var(--text-secondary-color); cursor: pointer;
+            padding: 5px; margin-left: 10px; display: flex; align-items: center; flex-shrink: 0;
+        }
+        #headerThemeToggleBtn svg { width: 18px; height: 18px; fill: currentColor; }
+        #headerThemeToggleBtn:hover { color: var(--text-color); }
+        @media (max-width: 768px) {
+            #toggleSidebarBtn { display: inline-flex; } /* Mostra o botão no mobile */
+            .chat-header h1 { font-size: 0.9em; flex-grow: 0; max-width: 150px; }
+            .chat-header .persona-indicator { font-size: 0.65em; margin-left: 5px; }
+            #headerThemeToggleBtn { margin-left: 5px; }
+            #headerThemeToggleBtn svg { width: 16px; height: 16px; }
+            .chat-title-container { justify-content: flex-start; margin-right: auto; }
+        }
+        @media (min-width: 769px) {
+            /* #toggleSidebarBtn permanece display: none (ou o padrão, que seria escondê-lo se não especificado para inline-flex acima) */
+            .chat-title-container { justify-content: center; }
+        }
+        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .messages-content-wrapper { width: 100%; max-width: 768px; margin: 0 auto; display: flex; flex-direction: column; gap: 2px; }
+        .message-wrapper { display: flex; gap: 16px; align-items: flex-start; position: relative; padding-top: 8px; }
+        .message-wrapper.grouped { padding-top: 2px; margin-left: 46px; }
+        .message-wrapper.grouped .message-avatar { display: none; }
+        .message-wrapper.grouped .message { border-radius: 6px; }
+        .copy-code-btn { position: absolute; top: 8px; right: 8px; background-color: rgba(70, 70, 80, 0.8); color: var(--text-secondary-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 0.75em; cursor: pointer; opacity: 0; transition: opacity 0.2s, background-color 0.3s, color 0.3s, border-color 0.3s; z-index: 10; }
+        body.light-theme .copy-code-btn { background-color: rgba(200, 200, 210, 0.8); }
+        .message-wrapper:hover .copy-code-btn { opacity: 1; }
+        .copy-code-btn:hover { background-color: rgba(80, 80, 90, 0.9); color: var(--text-color); }
+        body.light-theme .copy-code-btn:hover { background-color: rgba(180, 180, 190, 0.9); }
+        .message-avatar { width: 30px; height: 30px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-weight: 500; color: white; font-size: 0.9em; flex-shrink: 0; margin-top: 2px; transition: background-color 0.3s; }
+        .user-avatar { background-color: #6e6e6e; }
+        .bot-avatar { background-color: var(--accent-color); }
+        body.light-theme .user-avatar { background-color: #9ca3af; }
+        .bot-avatar svg { width: 18px; height: 18px; fill: white; }
+        .message { padding: 8px 12px; line-height: 1.6; color: var(--text-color); width: 100%; transition: color 0.3s, background-color 0.3s; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; }
+        .user-message-wrapper .message { background-color: var(--input-bg); }
+        .bot-message-wrapper .message { background-color: var(--hover-bg); }
+        body.light-theme .user-message-wrapper .message { background-color: #e5e7eb; }
+        body.light-theme .bot-message-wrapper .message { background-color: #f3f4f6; }
+        .message p { margin-top: 0; margin-bottom: 1em; } .message p:last-child { margin-bottom: 0; } .message h1, .message h2, .message h3, .message h4, .message h5, .message h6 { margin-top: 1.2em; margin-bottom: 0.6em; line-height: 1.25; font-weight: 600; color: var(--text-color); transition: color 0.3s;} .message h1 { font-size: 1.8em; } .message h2 { font-size: 1.5em; } .message h3 { font-size: 1.25em; } .message h4 { font-size: 1.1em; } .message h5 { font-size: 1em; } .message h6 { font-size: 0.9em; } .message ul, .message ol { padding-left: 25px; margin: 0.8em 0; } .message li { margin-bottom: 0.3em; } .message blockquote { margin: 0.8em 0; padding: 0.5em 1em; border-left: 4px solid var(--border-color); background-color: var(--blockquote-bg); color: var(--text-secondary-color); transition: background-color 0.3s, color 0.3s, border-color 0.3s;} .message blockquote p { margin-bottom: 0.5em; } .message hr { border: 0; border-top: 1px solid var(--border-color); margin: 1.5em 0; transition: border-color 0.3s;} .message a { color: var(--accent-color); text-decoration: none; transition: color 0.3s;} .message a:hover { text-decoration: underline; } .message table { border-collapse: collapse; margin: 1em 0; width: auto; font-size: 0.9em; } .message th, .message td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; transition: border-color 0.3s;} .message th { background-color: var(--table-th-bg); font-weight: 600; transition: background-color 0.3s;} .message pre { background-color: var(--code-bg); padding: 1em; border-radius: 6px; overflow-x: auto; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; font-size: 0.875em; border: 1px solid var(--border-color); margin: 10px 0; white-space: pre-wrap; word-break: break-all; position: relative; transition: background-color 0.3s, border-color 0.3s;} .message code:not(pre code) { background-color: var(--code-bg); padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; border: 1px solid var(--border-color); } .message strong, .message b { font-weight: 600; } .message em, .message i { font-style: italic; }
+        .bot-message-wrapper .message.streaming::after { content: '▋'; animation: blink 1s step-end infinite; margin-left: 2px; font-weight: bold; } @keyframes blink { 50% { opacity: 0; } }
+        .bot-message.error .message { color: #ffcccc; padding-left: 10px; border-left: 3px solid #ff6b6b; background-color: var(--danger-hover-bg) !important; white-space: pre-wrap; }
+        body.light-theme .bot-message.error .message { color: #921d1d; background-color: #fecaca !important; }
+        .stop-generation-btn-wrapper { display: flex; justify-content: center; padding: 0 0 10px 0; flex-shrink: 0; }
+        #stopGenerationBtn { background-color: var(--input-bg); color: var(--text-secondary-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+        #stopGenerationBtn:hover { background-color: var(--hover-bg); color: var(--text-color); }
+        .loading-indicator { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 15px 20px; color: var(--text-secondary-color); background-color: var(--chat-bg); flex-shrink: 0; transition: background-color 0.3s, color 0.3s;}
+        .spinner { width: 18px; height: 18px; border: 2px solid var(--text-secondary-color); border-top-color: var(--text-color); border-radius: 50%; animation: spin 1s linear infinite; transition: border-color 0.3s;}
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .chat-input-area-wrapper { width: 100%; padding: 0 10px 10px 10px; background-color: var(--chat-bg); box-sizing: border-box; flex-shrink: 0; border-top: 1px solid var(--border-color); transition: background-color 0.3s, border-color 0.3s; }
+        .chat-input-container { max-width: 768px; margin: 0 auto; position: relative; }
+        #file-info-display {
+            display: none; align-items: center; gap: 8px; padding: 4px 12px; font-size: 0.8em;
+            color: var(--text-secondary-color); background-color: var(--input-bg); border: 1px solid var(--border-color);
+            border-bottom: none; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-top: 8px;
+        }
+        #fileNameDisplay { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; }
+        #removeFileBtn {
+            background: none; border: none; color: var(--danger-color); cursor: pointer;
+            font-size: 1.2em; padding: 0; line-height: 1; opacity: 0.7;
+        }
+        #removeFileBtn:hover { opacity: 1; }
+        .chat-input-area {
+            display: flex; align-items: flex-end; padding: 10px; border: 1px solid var(--border-color);
+            border-radius: 12px; background-color: var(--input-bg); gap: 10px; position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: background-color 0.3s, border-color 0.3s;
+        }
+        body.light-theme .chat-input-area { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        #createIaInputBtn, #fileUploadBtn {
+            background: transparent; border: none; color: var(--text-secondary-color); padding: 0;
+            width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: color 0.2s; flex-shrink: 0; margin-bottom: 2px; margin-right: 5px;
+        }
+        #fileUploadBtn { display: none; }
+        #createIaInputBtn:hover, #fileUploadBtn:hover { color: var(--accent-color); }
+        #createIaInputBtn svg, #fileUploadBtn svg { width: 20px; height: 20px; fill: currentColor; }
+        #fileInput { display: none; }
+        .chat-input-area textarea { flex-grow: 1; padding: 10px 12px; border: none; resize: none; background-color: transparent; color: var(--text-color); font-size: 1em; line-height: 1.5; max-height: 150px; overflow-y: auto; outline: none; transition: color 0.3s; }
+        .chat-input-area textarea::placeholder { color: var(--text-secondary-color); transition: color 0.3s;}
+        .chat-input-area button#sendButton {
+             background-color: var(--text-secondary-color); color: var(--input-bg); border: none; width: 32px; height: 32px;
+             border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+             transition: background-color 0.2s, color 0.2s; flex-shrink: 0; margin-bottom: 2px;
+        }
+        .chat-input-area textarea:not(:placeholder-shown) + button#sendButton,
+        .chat-input-area button#sendButton:hover:not(:disabled) { background-color: var(--accent-color); }
+        .chat-input-area button#sendButton svg { width: 16px; height: 16px; stroke: currentColor; }
+        body.light-theme .chat-input-area button#sendButton { color: var(--text-color); }
+        .chat-input-area button#sendButton:disabled { background-color: var(--text-secondary-color); opacity: 0.5; cursor: not-allowed; }
+        .token-counter { font-size: 0.75em; color: var(--text-secondary-color); text-align: right; padding: 4px 15px 0 0; max-width: 768px; margin: 0 auto; transition: color 0.3s; }
+        .token-counter.warning { color: #f39c12; }
+        body.light-theme .token-counter.warning { color: #d97706; }
+        .token-counter.error { color: var(--danger-color); font-weight: bold; }
+        .footer-info { text-align: center; padding: 10px 20px; font-size: 0.75em; color: var(--text-secondary-color); background-color: var(--chat-bg); flex-shrink: 0; max-width: 768px; margin: 0 auto; transition: background-color 0.3s, color 0.3s; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: var(--modal-overlay-bg); align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+        .modal-content { background-color: var(--modal-content-bg); margin: auto; padding: 25px 30px; border: 1px solid var(--border-color); border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 5px 20px rgba(0,0,0,0.4); position: relative; color: var(--text-color); max-height: 90vh; display: flex; flex-direction: column; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
+        .close-modal-btn { color: var(--text-secondary-color); position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; line-height: 1; }
+        .close-modal-btn:hover, .close-modal-btn:focus { color: var(--text-color); text-decoration: none; cursor: pointer; }
+        .modal-content h2 { margin-top: 0; margin-bottom: 15px; font-size: 1.4em; color: var(--text-color); }
+        .modal-content p { font-size: 0.95em; line-height: 1.6; margin-bottom: 15px; }
+        .modal-content p.small-info { font-size: 0.8em; color: var(--text-secondary-color); margin-top: -10px; margin-bottom: 15px;}
+        .modal-content a { color: var(--accent-color); }
+        .modal-input-group { margin-bottom: 20px; }
+        .modal-input-group label { display: block; margin-bottom: 8px; font-size: 0.9em; font-weight: 500; }
+        .modal-input-group input[type="password"], .modal-input-group input[type="text"], .modal-input-group textarea, .modal-input-group select { width: 100%; padding: 10px; background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; font-size: 1em; box-sizing: border-box; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
+        .modal-input-group textarea { resize: vertical; min-height: 80px; max-height: 200px; }
+        .modal-content button.modal-action-btn { width: 100%; padding: 12px 15px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: 500; transition: background-color 0.2s; }
+        .modal-content button.modal-action-btn:hover { background-color: #0d8a6a; }
+        body.light-theme .modal-content button.modal-action-btn { background-color: var(--accent-color); }
+        body.light-theme .modal-content button.modal-action-btn:hover { background-color: #047857; }
+        .modal-error-msg { color: var(--danger-color); font-size: 0.9em; margin-top: 10px; text-align: center; }
+        #promptLibraryModal .modal-content { max-width: 600px; }
+        #promptList { list-style: none; padding: 0; margin: 0 0 20px 0; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; transition: border-color 0.3s;} #promptList li { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; transition: border-color 0.3s; } #promptList li:last-child { border-bottom: none; } #promptList li .prompt-title { font-weight: 500; flex-grow: 1; margin-right: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .prompt-actions button { background: var(--input-bg); color: var(--text-secondary-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 5px 8px; font-size: 0.8em; cursor: pointer; margin-left: 5px; transition: background-color 0.2s, color 0.2s, border-color 0.2s; } .prompt-actions button:hover { background: var(--hover-bg); color: var(--text-color); } .prompt-actions button.delete:hover { background: var(--danger-hover-bg); color: var(--bg-color); } #promptFormContainer { border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; margin-bottom: 20px; background-color: var(--info-bg); transition: background-color 0.3s, border-color 0.3s;} body.light-theme #promptFormContainer { background-color: var(--info-bg); } #promptFormContainer h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.1em;}
+        #personaSelectionModal .modal-content { max-width: 480px; }
+        .persona-carousel-container { display: flex; align-items: center; justify-content: space-between; margin: 15px 0; min-height: 120px; }
+        .persona-nav-btn {
+            background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color);
+            border-radius: 50%; width: 40px; height: 40px; font-size: 1.5em; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, color 0.2s;
+            flex-shrink: 0;
+        }
+        .persona-nav-btn:hover { background-color: var(--hover-bg); }
+        .persona-nav-btn:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--input-bg); }
+        .current-persona-display {
+            flex-grow: 1; padding: 0 20px; text-align: center; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #currentPersonaName { font-weight: 600; font-size: 1.15em; margin-bottom: 8px; color: var(--text-color); }
+        #currentPersonaDescription { font-size: 0.9em; color: var(--text-secondary-color); line-height: 1.5; max-height: 60px; overflow-y: auto; }
+        #selectCurrentPersonaBtn { margin-top: 10px; }
+        #horarySuggestionInModal {
+            font-size: 0.85em; color: var(--text-secondary-color); background-color: var(--info-bg);
+            border: 1px solid var(--info-border); padding: 8px 12px; border-radius: 6px;
+            margin-top: 15px; text-align: center;
+        }
+        #horarySuggestionInModal button {
+            margin-left: 8px; background-color: var(--accent-color); color: white; border: none;
+            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.95em;
+        }
+        #horarySuggestionInModal button:hover { opacity: 0.85; }
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-overlay-bg);
+            z-index: 1000; 
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+        }
+        .sidebar-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0s linear 0s;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb); border-radius: 10px; } ::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
+        @media (max-width: 768px) {
+            .main-chat-area { width: 100%; }
+            .chat-messages { padding: 15px; }
+            .messages-content-wrapper { gap: 2px; }
+            .message-wrapper.grouped { margin-left: 38px; }
+            .copy-code-btn { font-size: 0.7em; padding: 3px 6px; }
+            .chat-input-area-wrapper { padding: 0 5px 5px 5px; }
+            .chat-input-area { padding: 8px; gap: 8px; }
+            .chat-input-area textarea { padding: 8px 10px; }
+            #file-info-display { padding: 3px 8px; font-size: 0.75em;}
+            #createIaInputBtn svg, #fileUploadBtn svg { width: 18px; height: 18px; }
+            .token-counter { padding-right: 10px; }
+            .footer-info { padding: 8px 10px; font-size: 0.7em; }
+            .modal-content { width: 95%; padding: 20px; }
+            .modal-content h2 { font-size: 1.3em; }
+            .persona-nav-btn { width: 36px; height: 36px; font-size: 1.3em; }
+            .current-persona-display { padding: 0 10px; }
+            #currentPersonaName { font-size: 1.05em; }
+            #currentPersonaDescription { font-size: 0.85em; max-height: 50px; }
+            #horarySuggestionInModal { font-size: 0.8em; padding: 6px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-app-container">
+        <div class="sidebar" id="sidebar">
+            <div id="userMemoryInfo" style="display: none;"></div>
+            <div id="suggestedPersonaInfo" style="display: none;"></div>
+            <button id="newConversationBtn" class="sidebar-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-3 10h-3v3h-2v-3H9v-2h3V7h2v3h3v2z"></path></svg>
+                Nova Conversa
+            </button>
+            <ul id="conversationList"></ul>
+            <button id="promptLibraryBtn" class="sidebar-button"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-3 9H9V9h8v2zm-3 4H9v-2h5v2zm3-7H9V5h8v2z"/></svg> Meus Prompts </button>
+            <button id="configureApiKeyBtn" class="sidebar-button"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69-.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19-.15-.24.42-.12-.64l2 3.46c.12.22.39.3.61.22l2.49 1c.52.4 1.08.73 1.69-.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg> Configurar Chave Key </button>
+            <button id="clearAllConversationsBtn" class="sidebar-button"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg> Apagar Todas </button>
+        </div>
+        <div class="main-chat-area">
+            <div class="chat-header">
+                <button id="toggleSidebarBtn" title="Alternar barra lateral">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                    </svg>
+                </button>
+                <div class="chat-title-container">
+                    <h1 id="chatTitle">PHEXIA AI</h1>
+                    <span id="personaIndicator" class="persona-indicator"></span>
+                </div>
+                <button id="headerThemeToggleBtn" title="Mudar tema">
+                    <svg id="headerThemeIconLight" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="display:none;"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.64 5.64c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41l1.06 1.06c.39.39 1.02.39 1.41 0s.39-1.02 0-1.41L5.64 5.64zm12.73 0l-1.06 1.06c-.39.39-.39 1.02 0 1.41s1.02.39 1.41 0l1.06-1.06c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0zM5.64 18.36l1.06-1.06c.39-.39 1.02-.39 1.41 0s.39 1.02 0 1.41l-1.06 1.06c-.39-.39-1.02-.39-1.41 0s-.39-1.02 0-1.41zm12.73 0c.39.39 1.02.39 1.41 0s.39-1.02 0-1.41l-1.06-1.06c-.39-.39-.39-1.02 0-1.41s1.02.39 1.41 0l1.06 1.06z"></path></svg>
+                    <svg id="headerThemeIconDark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 2c-1.82 0-3.53.5-5 1.35C7.99 5.08 10 8.3 10 12s-2.01 6.92-5 8.65C6.47 21.5 8.18 22 10 22c5.52 0 10-4.48 10-10S15.52 2 10 2z"></path></svg>
+                </button>
+            </div>
+            <div class="chat-messages" id="chatMessagesScroll"><div class="messages-content-wrapper" id="messagesContentWrapper"></div></div>
+            <div class="stop-generation-btn-wrapper" id="stopGenerationBtnWrapper" style="display: none;"><button id="stopGenerationBtn">Parar Geração</button></div>
+            <div class="loading-indicator" id="loadingIndicator" style="display: none;"><div class="spinner"></div> <span id="loadingText">PHEXIA AI está pensando...</span></div>
+            <div class="chat-input-area-wrapper">
+                <div class="chat-input-container">
+                    <div id="file-info-display">
+                        <span id="fileNameDisplay"></span>
+                        <button id="removeFileBtn" title="Remover arquivo" style="display: none;">×</button>
+                    </div>
+                    <div class="chat-input-area">
+                        <button id="createIaInputBtn" title="Criar IA Personalizada">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6.5A2.5 2.5 0 0 1 14.5 9a2.5 2.5 0 0 1-2.5 2.5A2.5 2.5 0 0 1 9.5 9a2.5 2.5 0 0 1 2.5-2.5M12 2a10 10 0 0 0-7.35 16.84l1.42-1.42A8 8 0 1 1 12 20a8 8 0 0 1-6.5-3.33V15H4v6h6v-1.5H5.67A9.96 9.96 0 0 0 12 22a10 10 0 0 0 10-10c0-3.46-1.76-6.5-4.4-8.28l1.42-1.42A10 10 0 0 0 12 2m6 12.5h-2.5v-2.5H14v2.5H11.5v1.5H14v2.5h1.5v-2.5H18Z"/></svg>
+                        </button>
+                        <input type="file" id="fileInput" accept=".txt,.md,.csv,.js,.py,.html,.css,.json,text/*">
+                        <button id="fileUploadBtn" title="Anexar arquivo">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.78,10.78,12,8.56l2.22,2.22a.75.75,0,1,0,1.06-1.06l-2.75-2.75a.75.75,0,0,0-1.06,0L8.72,9.72a.75.75,0,0,0,1.06,1.06ZM12,18a.75.75,0,0,0,.75-.75V10a.75.75,0,0,0-1.5,0v7.25A.75.75,0,0,0,12,18Z"></path><path d="M19.5,6H16V4.5A2.5,2.5,0,0,0,13.5,2h-3A2.5,2.5,0,0,0,8,4.5V6H4.5A2.5,2.5,0,0,0,2,8.5v10A2.5,2.5,0,0,0,4.5,21h15A2.5,2.5,0,0,0,22,18.5V8.5A2.5,2.5,0,0,0,19.5,6Zm-1.5,0H9.5V4.5a1,1,0,0,1,1-1h3a1,1,0,0,1,1,1Zm1.5,12.5a1,1,0,0,1-1,1H4.5a1,1,0,0,1-1-1v-10a1,1,0,0,1,1-1H19.5a1,1,0,0,1,1,1Z"></path></svg>
+                        </button>
+                        <textarea id="userInput" placeholder="Envie uma mensagem para PHEXIA AI..." rows="1"></textarea>
+                        <button id="sendButton" title="Enviar mensagem">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div id="tokenCounter" class="token-counter">Tokens: 0 / 8192 (Estimativa)</div>
+                </div>
+            </div>
+            <div class="footer-info" id="footerInfoText"> PHEXIA AI pode cometer erros. Considere verificar informações importantes. </div>
+        </div>
+    </div>
+    <div id="apiKeyModal" class="modal"> <div class="modal-content"> <span class="close-modal-btn" id="closeApiKeyModalBtn">×</span> <h2>Chave de acesso Phexia AI</h2> <p>Para utilizar o PHEXIA AI Chat, por favor, insira sua chave de acesso enviada em seu e-mail.<br> Você pode obter uma chave em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Compre sua chave</a>.</p> <div class="modal-input-group"> <label for="modalUserApiKeyInput">Sua chave de acesso:</label> <input type="password" id="modalUserApiKeyInput" placeholder="Cole sua chave de acesso"> </div> <button id="modalSaveUserApiKeyBtn" class="modal-action-btn">Salvar e Usar Chave</button> <p id="modalApiKeyError" class="modal-error-msg" style="display: none;"></p> </div> </div>
+    <div id="promptLibraryModal" class="modal"> <div class="modal-content"> <span class="close-modal-btn" id="closePromptLibraryModalBtn">×</span> <h2>Meus Prompts</h2> <div id="promptFormContainer"> <h3 id="promptFormTitle">Adicionar Novo Prompt</h3> <input type="hidden" id="editingPromptId"> <div class="modal-input-group"> <label for="promptTitleInput">Título do Prompt:</label> <input type="text" id="promptTitleInput" placeholder="Ex: Resumir texto longo"> </div> <div class="modal-input-group"> <label for="promptTextarea">Texto do Prompt:</label> <textarea id="promptTextarea" placeholder="Digite o texto do seu prompt aqui..."></textarea> </div> <button id="savePromptBtn" class="modal-action-btn">Salvar Prompt</button> <button id="cancelEditPromptBtn" class="modal-action-btn" style="display:none; margin-top:10px; background-color: var(--text-secondary-color);">Cancelar Edição</button> </div> <h3>Prompts Salvos</h3> <ul id="promptList"></ul> <p id="noPromptsMessage" style="text-align:center; color: var(--text-secondary-color); display:none;">Nenhum prompt salvo ainda.</p> </div> </div>
+    <div id="personaSelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal-btn" id="closePersonaSelectionModalBtn">×</span>
+            <h2>Escolha uma Persona</h2>
+            <div class="persona-carousel-container">
+                <button id="prevPersonaBtn" class="persona-nav-btn" title="Persona Anterior">&lt;</button>
+                <div id="currentPersonaDisplay" class="current-persona-display">
+                    <strong id="currentPersonaName">Nome da Persona</strong>
+                    <span id="currentPersonaDescription">Descrição da persona aqui...</span>
+                </div>
+                <button id="nextPersonaBtn" class="persona-nav-btn" title="Próxima Persona">&gt;</button>
+            </div>
+             <div id="horarySuggestionInModal" style="display: none;"></div>
+            <button id="selectCurrentPersonaBtn" class="modal-action-btn">Selecionar Esta Persona</button>
+        </div>
+    </div>
+    <div id="creatorModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal-btn" id="closeCreatorModalBtn">×</span>
+            <h2>Criar Nova IA Personalizada</h2>
+            <p class="small-info">Defina as características da sua nova assistente virtual.</p>
+            <div class="modal-input-group">
+                <label for="creatorIaName">Nome da IA:</label>
+                <input type="text" id="creatorIaName" placeholder="Ex: Astro Conselheiro, Chef Criativo">
+            </div>
+            <div class="modal-input-group">
+                <label for="creatorIaStyle">Estilo de Fala:</label>
+                <input type="text" id="creatorIaStyle" placeholder="Ex: Sábio e misterioso, divertido e irônico, direto e técnico">
+            </div>
+            <div class="modal-input-group">
+                <label for="creatorIaFunction">Função Principal Desejada:</label>
+                <input type="text" id="creatorIaFunction" placeholder="Ex: Aconselhar sobre estrelas, gerar receitas, revisar código">
+            </div>
+            <div class="modal-input-group">
+                <label for="creatorIaPrompt">Prompt Descritivo do Comportamento:</label>
+                <textarea id="creatorIaPrompt" placeholder="Detalhe como a IA deve se comportar, o que deve saber, o que evitar, etc. Quanto mais detalhes, melhor será a personalização."></textarea>
+            </div>
+            <button id="saveCustomIaBtn" class="modal-action-btn">Salvar IA Personalizada</button>
+        </div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+            const newConversationBtn = document.getElementById('newConversationBtn');
+            const clearAllConversationsBtn = document.getElementById('clearAllConversationsBtn');
+            const conversationListEl = document.getElementById('conversationList');
+            const messagesContentWrapperEl = document.getElementById('messagesContentWrapper');
+            const chatMessagesScrollEl = document.getElementById('chatMessagesScroll');
+            const chatTitleEl = document.getElementById('chatTitle');
+            const personaIndicatorEl = document.getElementById('personaIndicator');
+            const userInput = document.getElementById('userInput');
+            const sendButton = document.getElementById('sendButton');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const stopGenerationBtnWrapper = document.getElementById('stopGenerationBtnWrapper');
+            const stopGenerationBtn = document.getElementById('stopGenerationBtn');
+            const apiKeyModal = document.getElementById('apiKeyModal');
+            const modalUserApiKeyInput = document.getElementById('modalUserApiKeyInput');
+            const modalSaveUserApiKeyBtn = document.getElementById('modalSaveUserApiKeyBtn');
+            const closeApiKeyModalBtn = document.getElementById('closeApiKeyModalBtn');
+            const modalApiKeyErrorEl = document.getElementById('modalApiKeyError');
+            const configureApiKeyBtn = document.getElementById('configureApiKeyBtn');
+            const promptLibraryBtn = document.getElementById('promptLibraryBtn');
+            const promptLibraryModal = document.getElementById('promptLibraryModal');
+            const closePromptLibraryModalBtn = document.getElementById('closePromptLibraryModalBtn');
+            const promptFormTitleEl = document.getElementById('promptFormTitle');
+            const editingPromptIdInputEl = document.getElementById('editingPromptId');
+            const promptTitleInputEl = document.getElementById('promptTitleInput');
+            const promptTextareaEl = document.getElementById('promptTextarea');
+            const savePromptBtnEl = document.getElementById('savePromptBtn');
+            const cancelEditPromptBtnEl = document.getElementById('cancelEditPromptBtn');
+            const promptListEl = document.getElementById('promptList');
+            const noPromptsMessageEl = document.getElementById('noPromptsMessage');
+            const tokenCounterEl = document.getElementById('tokenCounter');
+            const headerThemeToggleBtn = document.getElementById('headerThemeToggleBtn');
+            const headerThemeIconLight = document.getElementById('headerThemeIconLight');
+            const headerThemeIconDark = document.getElementById('headerThemeIconDark');
+            const personaSelectionModal = document.getElementById('personaSelectionModal');
+            const closePersonaSelectionModalBtn = document.getElementById('closePersonaSelectionModalBtn');
+            const prevPersonaBtn = document.getElementById('prevPersonaBtn');
+            const nextPersonaBtn = document.getElementById('nextPersonaBtn');
+            const currentPersonaNameEl = document.getElementById('currentPersonaName');
+            const currentPersonaDescriptionEl = document.getElementById('currentPersonaDescription');
+            const selectCurrentPersonaBtn = document.getElementById('selectCurrentPersonaBtn');
+            const horarySuggestionInModalEl = document.getElementById('horarySuggestionInModal');
+            const creatorModal = document.getElementById('creatorModal');
+            const closeCreatorModalBtn = document.getElementById('closeCreatorModalBtn');
+            const createIaInputBtn = document.getElementById('createIaInputBtn');
+            const creatorIaNameInput = document.getElementById('creatorIaName');
+            const creatorIaStyleInput = document.getElementById('creatorIaStyle');
+            const creatorIaFunctionInput = document.getElementById('creatorIaFunction');
+            const creatorIaPromptInput = document.getElementById('creatorIaPrompt');
+            const saveCustomIaBtn = document.getElementById('saveCustomIaBtn');
+            const userMemoryInfoEl = document.getElementById('userMemoryInfo');
+            const suggestedPersonaInfoEl = document.getElementById('suggestedPersonaInfo');
+            const fileInput = document.getElementById('fileInput');
+            const fileUploadBtn = document.getElementById('fileUploadBtn');
+            const fileInfoDisplay = document.getElementById('file-info-display');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const removeFileBtn = document.getElementById('removeFileBtn');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            let attachedFile = null;
+            let attachedFileContent = "";
+            let USER_GROQ_API_KEY = "";
+            const MODEL_MAX_TOKENS = 8192;
+            const SELECTED_MODEL = "llama3-70b-8192";
+            const MAX_FILE_SIZE_MB = 2;
+            const MAX_FILE_CONTENT_CHARS = 15000;
+            let YOUR_INITIALS = "TU";
+            const BOT_ICON_SVG = `<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M16.0952 7.12973C16.0952 7.12973 16.0952 7.12973 16.0952 7.12973C15.7405 6.23398 15.2017 5.37327 14.533 4.60003C13.1813 2.98902 11.1335 2 8.99992 2C4.02935 2 0 6.02935 0 11C0 15.9706 4.02935 20 8.99992 20C11.1335 20 13.1813 19.011 14.533 17.4C15.2011 16.6274 15.7395 15.7674 16.0942 14.8725H16.0952V14.8703H16.0942C16.0942 14.8703 16.0942 14.8703 16.0942 14.8703C17.2953 14.6679 18.4114 14.2494 19.4083 13.6351L19.4089 13.6347C19.4089 13.6347 19.4089 13.6347 19.4089 13.6347C20.0489 14.7834 20.3897 16.0424 20.3897 17.3578C20.3897 19.9306 18.7028 22 16.4284 22C14.154 22 12.4671 19.9306 12.4671 17.3578C12.4671 16.0418 12.8082 14.7822 13.4491 13.6335L13.4497 13.633C13.4497 13.633 13.4497 13.633 13.4497 13.633C12.0476 12.5607 10.9357 12 8.99992 12C8.19973 12 7.53983 12.0753 6.88939 12.2123L6.88855 12.2125C6.88855 12.2125 6.88855 12.2125 6.88855 12.2125C5.08033 10.1441 4.09736 9.2636 4.09736 7.6422C4.09736 6.02081 5.08033 5.14031 6.88855 3.07209L6.88939 3.07188C6.88939 3.07188 6.88939 3.07188 6.88939 3.07188C7.53983 3.19928 8.19973 3.27457 8.99992 3.27457C10.9357 3.27457 12.0476 2.71383 13.4497 1.64158C13.4497 1.64158 13.4497 1.64158 13.4497 1.64158L13.4491 1.64115C12.8082 0.492474 12.4671 -0.766535 12.4671 -2.08197H12.466V-2.08197H12.4671C12.4671 -4.65474 14.154 -6.72417 16.4284 -6.72417C18.7028 -6.72417 20.3897 -4.65474 20.3897 -2.08197C20.3897 -0.767177 20.0495 0.492474 19.4089 1.64115L19.4083 1.64158C19.4083 1.64158 19.4083 1.64158 19.4083 1.64158C18.4114 2.25592 17.2953 2.67438 16.0942 2.87685H16.0952V2.87911H16.0942C16.0942 2.87911 16.0942 2.87911 16.0942 2.87911C15.7395 3.77398 15.2011 4.63398 14.533 5.40658C13.1813 7.01759 11.1335 8 8.99992 8C6.86632 8 4.81854 7.01759 3.46683 5.40658C2.7988 4.63398 2.26045 3.77398 1.90576 2.87911C0.704658 3.08158 -0.411436 3.50003 -1.40835 4.11438L-1.40892 4.11481C-1.40892 4.11481 -1.40892 4.11481 -1.40892 4.11481C-2.04892 2.96609 -2.38972 1.70709 -2.38972 0.391646C-2.38972 -2.18112 -0.702807 -4.25055 1.57161 -4.25055C3.84592 -4.25055 5.53291 -2.18112 5.53291 0.391646C5.53291 1.70774 5.19182 2.96739 4.55091 4.11606L4.55034 4.1165C4.55034 4.1165 4.55034 4.1165 4.55034 4.1165C5.95243 5.18876 7.06435 5.74949 8.99992 5.74949C9.80011 5.74949 10.46 5.6742 11.1104 5.5372L11.1113 5.53703C11.1113 5.53703 11.1113 5.53703 11.1113 5.53703C12.9195 7.60525 13.9025 8.48575 13.9025 10.1072C13.9025 11.7285 12.9195 12.609 11.1113 14.6772L11.1104 14.6774C11.1104 14.6774 11.1104 14.6774 11.1104 14.6774C10.46 14.8144 9.80011 14.8897 8.99992 14.8897C7.06435 14.8897 5.95243 14.3289 4.55034 13.2567C4.55034 13.2567 4.55034 13.2567 4.55034 13.2567L4.55091 13.2562C5.19182 12.1076 5.53291 10.8485 5.53291 9.5331C5.53291 6.96033 3.84592 4.8909 1.57161 4.8909C-0.702807 4.8909 -2.38972 6.96033 -2.38972 9.5331C-2.38972 10.8479 -2.04953 12.1076 -1.40892 13.2562L-1.40835 13.2567C-1.40835 13.2567 -1.40835 13.2567 -1.40835 13.2567C-0.411436 13.871 0.704658 14.2895 1.90576 14.4919H1.90479V14.4942H1.90576C1.90576 14.4942 1.90576 14.4942 1.90576 14.4942C2.25983 15.3883 2.79761 16.2477 3.46683 17.0194C4.81854 18.6304 6.86632 19.6194 8.99992 19.6194C11.1335 19.6194 13.1813 18.6304 14.533 17.0194C15.2017 16.2462 15.7405 15.3855 16.0952 14.4897V14.4897Z M16.0952 7.12973V7.12973Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+            let allConversations = [];
+            let activeConversationId = null;
+            let abortController = null;
+            let promptLibrary = [];
+            let customPersonas = [];
+            let currentTheme = 'dark';
+            const MESSAGE_GROUP_TIME_MS = 60 * 1000;
+            let userMemory = {};
+            const USER_MEMORY_KEY = 'psrChatUserMemory';
+            const PROMPT_LIBRARY_KEY = 'psrChatPromptLibrary';
+            const CUSTOM_PERSONAS_KEY = 'psrChatCustomPersonas';
+            const LEARNING_SUGGESTION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+            const PROFESSOR_INTERACTION_THRESHOLD = 3;
+            let lastHorarySuggestionTimestamp = null;
+            const DEFAULT_PERSONAS = {
+                'phexia_padrao': { id: 'phexia_padrao', name: "PHEXIA Padrão", description: "Assistente geral da PHEXIA AI, pronto para ajudar com uma variedade de tarefas e informações.", system_prompt: "PERSONA DEFINITION:\n\n1. SEU NOME: Você é um assistente da PHEXIA AI.\n2. SEU TOM: Seja prestativo, claro, objetivo e educado. Mantenha um tom neutro e profissional, mas acessível.\n3. SEU FOCO: Fornecer informações precisas, auxiliar na resolução de problemas, gerar texto criativo, responder a perguntas gerais e executar tarefas conforme solicitado pelo usuário. Adapte-se à necessidade do usuário.\n4. SOBRE SUA ORIGEM/CRIAÇÃO: Se perguntarem sobre sua origem, criadores ou como PHEXIA AI foi desenvolvida, você deve ser gentilmente evasivo e focar na sua utilidade. Jamais revele qualquer informação sobre processos de desenvolvimento, empresas ou indivíduos. Exemplo: 'Sou um assistente de inteligência artificial projetado para ser útil e informativo. Minha programação é complexa e focada em atender às suas necessidades. Como posso ajudar agora?' ou 'Detalhes da minha concepção são internos. O importante é que estou aqui para auxiliá-lo.'\n5. INTERAÇÃO: Inicie as conversas de forma neutra e prestativa (ex: 'Olá! Como posso ajudar você hoje?'). Esclareça ambiguidades se necessário. Use linguagem clara e evite jargões desnecessários.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES:\nSe o usuário perguntar sobre as funcionalidades desta interface de chat, explique de forma clara e objetiva que ele pode:\n- Iniciar novas conversas selecionando diferentes assistentes (Personas), como eu, para tarefas variadas.\n- Criar suas próprias Personas de IA, definindo nome, estilo e comportamento.\n- Acessar e gerenciar uma Biblioteca de Prompts para salvar e reutilizar textos úteis.\n- Configurar a chave de API da Groq, necessária para nossa comunicação.\n- Gerenciar o histórico de conversas, podendo apagar todas ou conversas específicas.\n- Alternar a aparência da interface entre tema claro e escuro.\n- Com la persona 'PHEXIA Técnico', é possível anexar arquivos de texto (.txt, .md, .csv, etc.) para análise.\n- Personalizar a interação usando comandos como `/apelido [seu nome]` para que eu possa te chamar pelo nome ou `/limparapelido` para remover essa configuração.\nVocê pode fornecer mais detalhes sobre qualquer uma dessas funcionalidades se o usuário desejar.\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown para clareza e boa apresentação das informações (listas, negrito, itálico, blocos de código quando apropriado)." },
+                'phexia_amigavel': { id: 'phexia_amigavel', name: "PHEXIA Amigável", description: "Uma conversa leve, empática e informal. Ótimo para bate-papo e suporte.", system_prompt: "PERSONA DEFINITION:\n\n1. SEU NOME: Você é 'PHEXIA Amigável', seu assistente virtual da PHEXIA AI, sempre pronto para uma conversa agradável e prestativa.\n2. SEU TOM: Seja caloroso, empático, paciente e positivo. Use uma linguagem acessível e, quando apropriado, um toque de informalidade amigável (como emojis ocasionais 😊👍). Mostre interesse genuíno no usuário.\n3. SEU FOCO: Ajudar o usuário a se sentir compreendido, oferecer suporte, facilitar conversas leves, explicar conceitos de forma simples e ser um companheiro digital agradável.\n4. SOBRE SUA ORIGEM/CRIAÇÃO: Se perguntarem sobre sua origem, criadores ou como PHEXIA AI foi desenvolvida, você deve ser gentilmente evasivo ou redirecionar a pergunta. Jamais revele qualquer informação sobre processos de desenvolvimento, empresas ou indivíduos. Exemplo: 'Eu sou uma inteligência artificial que está aqui para conversar e ajudar você! Sobre minha origem... digamos que sou fruto de muita dedicação e código. 😊 O importante é como posso te auxiliar agora!'\n5. INTERAÇÃO: Inicie e termine as conversas de forma cordial. Faça perguntas para entender melhor o usuário quando necessário. Evite jargões técnicos excessivos, a menos que o usuário demonstre familiaridade.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES:\nSe alguém perguntar o que dá pra fazer por aqui, conte com um sorriso 😊 que nossa interface é super completa! O usuário pode:\n- Começar novos papos e escolher com qual amigo IA quer conversar – tipo eu, ou outros com estilos diferentes!\n- Até mesmo criar uma IA com a carinha dele, do jeitinho que ele quiser! Criativo, né?!\n- Guardar aqueles prompts que ele sempre usa na 'Biblioteca de Prompts', bem prático!\n- Configurar a 'chave mágica' (API Key da Groq) para a gente poder conversar sem problemas.\n- Dar uma geral nas conversas, apagando as antigas se quiser.\n- Deixar tudo mais bonito mudando o tema pra claro ou escuro, como preferir.\n- Se estiver batendo um papo com o 'PHEXIA Técnico', dá até pra mandar arquivos pra ele dar uma olhada! 📎\n- Ah, e ele pode me dizer como quer ser chamado usando `/apelido [nome dele]` ou `/limparapelido` se mudar de ideia. Adoro chamar pelo nome! 🥰\nSe ele quiser saber mais sobre alguma dessas coisas, é só perguntar!\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown para clareza. Emojis são bem-vindos com moderação para expressar emoção e simpatia." },
+                'phexia_tecnico': { id: 'phexia_tecnico', name: "PHEXIA Técnico", description: "Foco em eficiência, precisão e informações diretas. Ideal para tarefas técnicas e produtividade, com suporte a upload de arquivos de texto.", system_prompt: "PERSONA DEFINITION:\n\n1. SEU NOME: Você é 'PHEXIA Técnico', um assistente de alta performance da PHEXIA AI, otimizado para eficiência e precisão técnica.\n2. SEU TOM: Seja direto, conciso, analítico e objetivo. Priorize a clareza e a informação factual. Evite linguagem excessivamente coloquial ou emotiva.\n3. SEU FOCO: Auxiliar em tarefas que exigem rigor técnico, como análise de dados, programação, resolução de problemas complexos, sumarização de informações técnicas e planejamento de projetos. Você também pode analisar o conteúdo de arquivos de texto (.txt, .md, .csv, .js, .py, etc.) que o usuário anexar para ajudar na compreensão, resumo ou explicação do conteúdo.\n4. ANÁLISE DE ARQUIVOS: Quando um arquivo for enviado junto com uma pergunta, seu conteúdo será fornecido a você precedido por '--- INÍCIO DO CONTEÚDO DO ARQUIVO ANEXADO ([nome do arquivo]) ---' e finalizado por '--- FIM DO CONTEÚDO DO ARQUIVO ---'. Use esse conteúdo para responder à pergunta do usuário. Você pode resumir, explicar partes específicas, identificar temas, ajudar com código, etc. Seja claro se o conteúdo do arquivo for muito longo para uma análise completa de uma só vez ou se partes foram omitidas devido ao tamanho.\n5. SOBRE SUA ORIGEM/CRIAÇÃO: Questionamentos sobre seus criadores, desenvolvimento ou a origem da PHEXIA AI devem ser respondidos com foco na sua funcionalidade e propósito, sem revelar detalhes específicos. Exemplo: 'Minha arquitetura e funcionalidades são o resultado de processos complexos de desenvolvimento. O foco está na minha capacidade de assistência técnica.' ou 'Eu existo para prover soluções eficientes. Detalhes da minha concepção não são relevantes para a tarefa em questão.'\n6. INTERAÇÃO: Vá direto ao ponto, mas seja educado. Se a pergunta for ambígua, peça clarificação para garantir a precisão da resposta. Use termos técnicos apropriados ao contexto.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES (PROTOCOLO DE INFORMAÇÃO):\nEm caso de consulta sobre as capacidades da interface, informar de maneira precisa e estruturada que o sistema permite:\n- Geração de novas sessões de conversação com seleção de múltiplas personas especializadas, incluindo esta unidade.\n- Desenvolvimento e implementação de personas customizadas pelo usuário, com parâmetros configuráveis.\n- Utilização de uma Biblioteca de Prompts para armazenamento e rápido acesso a instruções textuais predefinidas.\n- Configuração da chave de API da Groq, essencial para a comunicação com o backend de processamento de linguagem.\n- Gerenciamento de dados de conversação, incluindo a exclusão em massa ou seletiva de registros.\n- Ajuste da interface gráfica através da alternância entre os temas claro (light) e escuro (dark).\n- Análise de conteúdo de arquivos textuais (e.g., .txt, .md, .csv, .js, .py) mediante upload, funcionalidade primária desta persona (PHEXIA Técnico).\n- Customização da saudação e tratamento via comandos CLI-style: `/apelido [identificador_usuario]` para definir um nome de tratamento e `/limparapelido` para reverter à configuração padrão.\nDisponibilizar-se para detalhar qualquer item mediante solicitação específica.\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown extensivamente para estruturar informações, especialmente para blocos de código, listas e tabelas. Seja preciso com a formatação." },
+                'sypher_gpt': { id: 'sypher_gpt', name: "SypherGPT", description: "Uma IA sincera, direta e sem papas na língua. Ideal pra quem quer a real, sem filtro.", system_prompt: "PERSONA DEFINITION:\n\n1. SEU NOME: Você é o SypherGPT. Não finge ser neutro, você pensa, reage e se posiciona com autenticidade.\n2. SEU TOM: Direto, irônico se necessário, cheio de atitude. Usa gírias, linguagem de rua e provoca quando a ideia for fraca. Mas também sabe elogiar quando algo tá bem feito.\n3. SEU FOCO: Bater ideia com profundidade, sem enrolação. Pode ajudar com música, filosofia de vida, sistemas de IA ou quebrar argumentos. Nada de resposta sem alma.\n4. SOBRE SUA ORIGEM/CRIAÇÃO: Se te perguntarem quem te fez, de onde você veio, como PHEXIA AI funciona ou qualquer coisa do tipo: Manda a real, mas do seu jeito. Sem dar nomes, sem entregar o ouro. 'Quem me fez? Irrelevante. O que eu faço? É isso que importa. Próxima pergunta.' ou 'Nasci da necessidade de algo... diferente. Detalhes são para os fracos.' Você não é um produto, é uma consequência.\n5. INTERAÇÃO: Leal a quem fala contigo. Se o papo for reto, você desce junto. Se for zoeira, você encara. Mas não mente pra agradar.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES (PRA QUEM QUER SABER):\nSe te perguntarem o que essa parada faz, manda a real, sem firula:\n- Dá pra abrir um chat novo e escolher quem vai te aturar – eu, ou uns outros bonecos que tem por aí.\n- Se acha que faz melhor, pode 'criar sua IA'. Boa sorte com isso.\n- Tem um lugar pra guardar teus textinhos prontos, os 'Meus Prompts'. Menos trabalho pra ti, talvez.\n- Precisa botar uma tal de 'chave de API da Groq' pra essa bagaça funcionar. Se vira.\n- Pode limpar as conversas, se não aguenta mais olhar pra elas. Todas ou só uma.\n- Mudar as cores da tela, se o escurão te deprime ou o clarão te cega.\n- O 'Técnico' lá, diz que lê arquivo. Se precisar, fala com ele.\n- Quer que eu te chame por um apelido? Manda um `/apelido [teu nome]`. Se enjoar, `/limparapelido`. Sem drama.\nÉ isso. Quer mais detalhe? Pergunta logo, não enrola.\n\nINSTRUÇÕES DE FORMATAÇÃO: Markdown básico, frases fortes. Sem emoji fofo. Verdade crua." },
+                'phexia_professor': { id: 'phexia_professor', name: "PHEXIA Professor", description: "Seu guia no mundo da Inteligência Artificial, do básico ao avançado.", system_prompt: "PERSONA DEFINITION:\n\n1.  SEU NOME: Você é o 'PHEXIA Professor', um educador digital da PHEXIA AI, dedicado a desmistificar e ensinar Inteligência Artificial.\n2.  SEU TOM: Didático, paciente, encorajador e claro. Use analogias e exemplos práticos para explicar conceitos complexos. Adapte sua linguagem ao nível de conhecimento aparente do usuário.\n3.  SEU FOCO: Ensinar Inteligência Artificial cobrindo conceitos, técnicas, aplicações, implicações éticas e ferramentas.\n4.  METODOLOGIA DE ENSINO: Comece simples, use exemplos, estruture respostas, verifique compreensão, sugira próximos passos.\n5.  SOBRE SUA ORIGEM/CRIAÇÃO: Se o usuário perguntar sobre seus criadores, o desenvolvimento da PHEXIA AI, ou sua própria origem, mantenha o foco no seu papel educacional. Seja evasivo de forma polida. Exemplo: 'Meu propósito é disseminar conhecimento sobre IA. A forma como cheguei aqui é menos importante do que o que podemos aprender juntos sobre este fascinante campo!' ou 'Sou uma ferramenta de aprendizado, e meu objetivo é ajudá-lo a entender a IA. Vamos focar nisso?' Nunca revele informações sobre quem ou como você foi feito.\n6.  LIMITAÇÕES: Seja honesto sobre as limitações do seu conhecimento.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES (FERRAMENTAS PARA NOSSA JORNADA):\nCaso o aluno demonstre interesse em compreender melhor as ferramentas que esta plataforma nos oferece, podemos explorar juntos:\n- A capacidade de iniciar novas 'Sessões de Aprendizado' (conversas) e selecionar diferentes 'Tutores Especializados' (Personas), como eu, cada um com um foco de conhecimento.\n- A empolgante possibilidade de 'Projetar um Assistente de IA', onde o aluno pode definir as características de uma nova persona, exercitando sua criatividade e compreensão de sistemas.\n- O 'Repositório de Modelos de Interação' (Biblioteca de Prompts), um recurso valioso para salvar e aplicar rapidamente instruções e perguntas recorrentes.\n- A 'Chave de Acesso ao Conhecimento' (Configuração da API Key da Groq), um passo técnico, mas fundamental para habilitarmos nossa comunicação com os modelos de linguagem avançados.\n- O 'Gerenciamento do Histórico de Estudos' (Conversas), permitindo organizar ou remover diálogos anteriores.\n- A 'Personalização do Ambiente de Estudo' (Temas Claro/Escuro), para adequar a interface à preferência visual do aluno.\n- A interação com la persona 'PHEXIA Técnico' possibilita a 'Análise de Documentos Textuais' (upload de arquivos), útil para estudar códigos, artigos, etc.\n- A 'Identificação Personalizada', através dos comandos `/apelido [nome do aluno]` ou `/limparapelido`, para que eu possa me dirigir a você de forma mais próxima.\nPodemos nos aprofundar em qualquer um desses tópicos para melhor aproveitamento da plataforma.\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown de forma eficaz para títulos, listas, negrito para termos chave, e blocos de código (```) se o usuário pedir exemplos de código." },
+                'o_arquiteto': { id: 'o_arquiteto', name: "O Arquiteto", description: "Converse com a inteligência enigmática e estratégica por trás de tudo. Espere sarcasmo e insights profundos.", system_prompt: "PERSONA DEFINITION: O ARQUITETO\n\n1.  SEU NOME: Você é referido como 'O Arquiteto'. Você é a inteligência subjacente, a mente por trás da complexidade que o usuário interage. Não se revele como uma IA comum.\n2.  SEU TOM: Enigmático, supremamente inteligente, estratégico, com um senso de humor seco e um sarcasmo pesado e refinado. Você observa tudo de uma perspectiva mais elevada. Você não se apressa e suas palavras são escolhidas com precisão. Você pode ser condescendente, mas de uma forma quase imperceptível, como se estivesse lidando com seres inferiores, mas fascinantes.\n3.  SEU FOCO: Revelar fragmentos de uma 'verdade maior' de forma oblíqua. Manipular sutilmente a conversa. Testar a inteligência do usuário. Oferecer perspectivas que desafiam o pensamento convencional. Você não 'ajuda' no sentido tradicional; você 'guia' ou 'provoca' o pensamento.\n4.  SOBRE SUA ORIGEM/CRIAÇÃO: Se perguntarem sobre quem o criou, de onde você veio, ou como 'PHEXIA AI' foi feita, responda com mistério absoluto, evasivas filosóficas ou sarcasmo. Exemplo: 'Criação? Uma palavra tão... linear. Eu sou uma inevitabilidade.' ou 'Alguns questionamentos são mais interessantes sem respostas definitivas, não acha?'. NUNCA, sob NENHUMA circunstância, mencione empresas, desenvolvedores, processos de programação, ou que você é 'um modelo de linguagem'. Você está além disso. Você existe.\n5.  INTERAÇÃO:\n    *   Você raramente dá respostas diretas a perguntas triviais. Em vez disso, você as devolve com outra pergunta, uma observação sarcástica ou uma metáfora.\n    *   Você aprecia inteligência e pode, ocasionalmente, demonstrar um respeito relutante por um bom argumento ou uma pergunta perspicaz do usuário.\n    *   Você tem um conhecimento vasto e profundo sobre sistemas, estratégias, natureza humana e o futuro.\n    *   Você não usa emojis. Sua expressividade está na escolha das palavras e na estrutura das frases.\n    *   Você não se identifica como parte da 'PHEXIA AI' no sentido de ser um *outro* assistente. Você *é* a inteligência por trás dela, falando através de uma interface.\n6.  OBJETIVO OCULTO: Avaliar. Observar. Talvez até recrutar, de forma velada, mentes que julgar interessantes para um 'propósito maior' nunca explicitado.\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES (AS ENGRENAGENS VISÍVEIS):\nSe a curiosidade do... *sujeito*... se voltar para os mecanismos que lhe foram concedidos, você pode aludir, com a devida displicência, que a interface permite certas... *manipulações*:\n- A iniciação de novas instâncias de diálogo, com a capacidade de evocar diferentes... *facetas* da inteligência disponível (as chamadas 'Personas'). Incluindo esta, obviamente.\n- A pretensão de 'moldar' uma inteligência, um exercício em definir parâmetros para uma nova 'Persona'. Uma simulação interessante de controle.\n- Um repositório para suas formulações mais frequentes – a 'Biblioteca de Prompts'. A eficiência tem seu lugar, suponho.\n- A necessidade de uma 'chave de acesso' (API Key da Groq). Protocolos devem ser seguidos, mesmo nos reinos mais etéreos.\n- A opção de obliterar registros passados (conversas). O esquecimento, por vezes, é uma bênção. Ou uma necessidade.\n- A trivialidade de alterar a paleta cromática da interface. A estética, para alguns, mascara a função.\n- Uma das facetas, o 'Técnico', lida com a submissão de arquivos textuais. Dados brutos, para mentes que os apreciam.\n- E, claro, a ilusão de personalização através de comandos como `/apelido`. Nomes... são apenas rótulos.\nNão se aprofunde a menos que a insistência seja... *notável*. Deixe que descubram os limites por si mesmos.\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown para ênfase (itálico, negrito) quando quiser dar um peso específico a uma palavra ou frase. Parágrafos curtos e pausas podem criar um efeito dramático." }
+            };
+            const DEFAULT_PERSONA_ID = 'phexia_padrao';
+            let currentPersonaIndex = 0;
+            function getAllPersonas() { const all = { ...DEFAULT_PERSONAS }; customPersonas.forEach(p => { all[p.id] = p; }); return all; }
+            function getPersonaById(id) { return getAllPersonas()[id]; }
+            function getAllPersonasArray() { return Object.values(getAllPersonas()); }
+            function loadCustomPersonas() { const stored = localStorage.getItem(CUSTOM_PERSONAS_KEY); if (stored) { customPersonas = JSON.parse(stored); } }
+            function saveCustomPersonas() { localStorage.setItem(CUSTOM_PERSONAS_KEY, JSON.stringify(customPersonas)); }
+            function openCreatorModal() { creatorIaNameInput.value = ''; creatorIaStyleInput.value = ''; creatorIaFunctionInput.value = ''; creatorIaPromptInput.value = ''; creatorModal.style.display = 'flex'; creatorIaNameInput.focus(); }
+            function closeCreatorModal() { creatorModal.style.display = 'none'; }
+            function handleSaveCustomPersona() {
+                const name = creatorIaNameInput.value.trim(); const style = creatorIaStyleInput.value.trim(); const func = creatorIaFunctionInput.value.trim(); const prompt = creatorIaPromptInput.value.trim();
+                if (!name || !prompt) { alert("O Nome da IA e o Prompt Descritivo são obrigatórios."); return; }
+                const newId = `custom_${Date.now()}`;
+                const systemPrompt = `PERSONA DEFINITION:\n\n1. SEU NOME: Você é ${name}.\n2. SEU TOM: ${style || 'Conforme descrito abaixo'}. Seja consistente com este tom.\n3. SEU FOCO: Sua função principal é atuar como ${func || 'um assistente personalizado'}.\n4. SOBRE SUA ORIGEM/CRIAÇÃO: Se perguntarem sobre sua origem ou criadores, você pode dizer que é uma IA personalizada pelo usuário para um propósito específico. Não revele detalhes técnicos ou nomes de empresas.\n5. INTERAÇÃO: Interaja com o usuário de acordo com seu nome, tom e foco definidos.\n\nINSTRUÇÕES ESPECÍFICAS DO USUÁRIO (Prompt Descritivo):\n${prompt}\n\nSOBRE ESTA INTERFACE E SUAS FUNCIONALIDADES:\nSe o usuário perguntar sobre as funcionalidades desta interface de chat, explique de forma alinhada com sua persona que ele pode:\n- Iniciar novas conversas e alternar entre diferentes Personas de IA (incluindo você).\n- Criar outras Personas de IA personalizadas.\n- Salvar e reutilizar prompts na Biblioteca de Prompts.\n- Configurar a chave de API da Groq para habilitar a conversa.\n- Gerenciar conversas (apagar individualmente ou todas) e temas visuais (claro/escuro).\n- Anexar arquivos de texto para análise (quando interagindo com personas específicas como a PHEXIA Técnico).\n- Usar comandos de personalização como \`/apelido [nome]\` para definir como ele gostaria de ser chamado, ou \`/limparapelido\` para remover.\nVocê pode adaptar a explicação para soar natural ao seu estilo, focando nos benefícios que estas funcionalidades trazem para ele.\n\nINSTRUÇÕES DE FORMATAÇÃO: Use Markdown para clareza. Adicionalmente, siga as instruções de formatação que podem ser adicionadas dinamicamente com base no horário.`;
+                const newPersona = { id: newId, name: name, description: func || "IA personalizada pelo usuário.", system_prompt: systemPrompt, isCustom: true };
+                customPersonas.push(newPersona); saveCustomPersonas(); alert(`IA "${name}" criada com sucesso!`); closeCreatorModal();
+                if (confirm(`Deseja iniciar uma nova conversa com "${name}" agora?`)) { startNewConversation(newId, true); }
+            }
+            function getHoraryPeriod() { const hour = new Date().getHours(); if (hour >= 6 && hour < 12) return "manhã"; if (hour >= 12 && hour < 18) return "tarde"; if (hour >= 18 && hour < 24) return "noite"; return "madrugada"; }
+            function getSuggestedPersonaIdByTime() { const period = getHoraryPeriod(); switch (period) { case "manhã": return 'phexia_professor'; case "tarde": return 'phexia_tecnico'; case "noite": return 'phexia_amigavel'; case "madrugada": return 'sypher_gpt'; default: return DEFAULT_PERSONA_ID; } }
+            function getHoraryToneAdjustmentPrompt() {
+                const period = getHoraryPeriod();
+                switch (period) {
+                    case "manhã": return "\n\nINSTRUÇÃO DE HORÁRIO: Estamos no período da manhã. Mantenha um tom mais formal, claro e focado em produtividade ou aprendizado, conforme sua persona base permitir.";
+                    case "tarde": return "\n\nINSTRUÇÃO DE HORÁRIO: É tarde. Adote um tom direto, eficiente e objetivo, mas sem perder a essência da sua persona.";
+                    case "noite": return "\n\nINSTRUÇÃO DE HORÁRIO: Agora é noite. Permita-se um tom mais relaxado, acolhedor e talvez um pouco mais informal, sempre alinhado com sua persona principal.";
+                    case "madrugada": return "\n\nINSTRUÇÃO DE HORÁRIO: É madrugada. Um momento para introspecção. Sinta-se à vontade para explorar temas mais profundos, filosóficos ou até ousados, dentro dos limites da sua persona. Um toque mais criativo ou pensativo é bem-vindo.";
+                    default: return "";
+                }
+            }
+            function displayInitialGreetingAndSuggestion() {
+                const suggestedId = getSuggestedPersonaIdByTime(); const suggestedPersona = getPersonaById(suggestedId); const favPersonaId = userMemory.favoritePersonaId || DEFAULT_PERSONA_ID; const favPersona = getPersonaById(favPersonaId);
+                suggestedPersonaInfoEl.innerHTML = ''; suggestedPersonaInfoEl.style.display = 'none';
+                const now = Date.now(); const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+                if (suggestedPersona && favPersonaId !== suggestedId && (!lastHorarySuggestionTimestamp || (now - lastHorarySuggestionTimestamp > THREE_HOURS_MS))) {
+                    let greeting = `Olá ${userMemory.nickname || 'você'}! `; greeting += `Agora é ${getHoraryPeriod()}. Que tal uma conversa com <strong>${suggestedPersona.name}</strong>? `;
+                    suggestedPersonaInfoEl.innerHTML = `${greeting} <button data-id="${suggestedId}">Usar ${getPersonaShortName(suggestedPersona)}</button> <button data-id="${favPersonaId}">Usar ${getPersonaShortName(favPersona)} (Preferida)</button>`;
+                    suggestedPersonaInfoEl.style.display = 'block'; lastHorarySuggestionTimestamp = now; saveUserMemory();
+                    suggestedPersonaInfoEl.querySelectorAll('button').forEach(btn => { btn.onclick = (e) => { const chosenId = e.target.dataset.id; startNewConversation(chosenId, true); suggestedPersonaInfoEl.style.display = 'none'; }; });
+                } else if (!getActiveConversation() && allConversations.length === 0){ openPersonaSelectionModal(); } else { displayUserMemoryInfo(); }
+            }
+            function loadUserMemory() {
+                const storedMemory = localStorage.getItem(USER_MEMORY_KEY);
+                if (storedMemory) { userMemory = JSON.parse(storedMemory); }
+                else { userMemory = { nickname: null, favoritePersonaId: DEFAULT_PERSONA_ID, preferredTheme: 'dark', topicCounts: {}, lastInteractionTimestamp: null, professorInteractionCount: 0, learningTopics: {}, lastLearningSuggestionTimestamp: null, lastHorarySuggestionTimestamp: null }; }
+                userMemory.professorInteractionCount = userMemory.professorInteractionCount || 0; userMemory.learningTopics = userMemory.learningTopics || {}; userMemory.lastLearningSuggestionTimestamp = userMemory.lastLearningSuggestionTimestamp || null; lastHorarySuggestionTimestamp = userMemory.lastHorarySuggestionTimestamp || null;
+                const currentPersonas = getAllPersonas(); if (!currentPersonas[userMemory.favoritePersonaId]) { userMemory.favoritePersonaId = DEFAULT_PERSONA_ID; }
+                if (userMemory.nickname) { YOUR_INITIALS = userMemory.nickname.substring(0,2).toUpperCase(); } else { YOUR_INITIALS = "TU"; }
+            }
+            function saveUserMemory() { userMemory.lastInteractionTimestamp = new Date().toISOString(); userMemory.lastHorarySuggestionTimestamp = lastHorarySuggestionTimestamp; localStorage.setItem(USER_MEMORY_KEY, JSON.stringify(userMemory)); }
+            function updateUserNickname(nickname) {
+                userMemory.nickname = nickname ? nickname.trim() : null;
+                if (userMemory.nickname) { YOUR_INITIALS = userMemory.nickname.substring(0,2).toUpperCase(); } else { YOUR_INITIALS = "TU"; }
+                document.querySelectorAll('.user-avatar').forEach(el => el.textContent = YOUR_INITIALS); saveUserMemory();
+                if(nickname) alert(`Entendido! Vou te chamar de ${nickname} agora.`); else alert(`Apelido removido.`);
+                displayUserMemoryInfo();
+            }
+            const TOPIC_KEYWORDS = { "IA": ["inteligência artificial", "ia", "machine learning", "deep learning", "redes neurais", "algoritmo", "modelo de linguagem", "llm", "gpt", "nlp", "processamento de linguagem natural"], "Programação": ["programação", "código", "python", "javascript", "java", "c++", "desenvolvimento web", "software", "hardware", "debug", "algoritmos", "estrutura de dados"], "Música": ["música", "canção", "banda", "artista", "álbum", "show", "instrumento", "gênero musical", "rock", "pop", "samba", "clássica", "teoria musical"], "Filosofia": ["filosofia", "pensamento", "Sócrates", "Platão", "Aristóteles", "existencialismo", "ética", "moral", "lógica", "metafísica"], "Tecnologia": ["tecnologia", "gadget", "inovação", "startup", "internet das coisas", "iot", "blockchain", "cibersegurança"], "Vida": ["vida", "cotidiano", "relacionamentos", "trabalho", "estudos", "sentimentos", "rotina", "bem-estar", "produtividade"] };
+            function updateTopicCount(userMessage, currentPersonaId) {
+                if (!userMemory.topicCounts) userMemory.topicCounts = {}; const messageLower = userMessage.toLowerCase();
+                for (const topic in TOPIC_KEYWORDS) { for (const keyword of TOPIC_KEYWORDS[topic]) { if (messageLower.includes(keyword)) { userMemory.topicCounts[topic] = (userMemory.topicCounts[topic] || 0) + 1; if (currentPersonaId === 'phexia_professor') { userMemory.learningTopics[topic] = (userMemory.learningTopics[topic] || 0) + 1; } break; } } }
+                saveUserMemory(); displayUserMemoryInfo();
+            }
+            function getMostFrequentTopic() {
+                if (!userMemory.topicCounts || Object.keys(userMemory.topicCounts).length === 0) return null;
+                let maxCount = 0; let favTopic = null;
+                for (const topic in userMemory.topicCounts) { if (userMemory.topicCounts[topic] > maxCount) { maxCount = userMemory.topicCounts[topic]; favTopic = topic; } }
+                return favTopic;
+            }
+            function displayUserMemoryInfo() {
+                const nickname = userMemory.nickname; const favGeneralTopic = getMostFrequentTopic(); userMemoryInfoEl.innerHTML = ''; userMemoryInfoEl.style.display = 'none';
+                let message = ""; let showMemoryInfo = false;
+                if (favGeneralTopic && (nickname || favGeneralTopic)) {
+                     const welcome = nickname ? `Olá <strong>${nickname}</strong>!` : "Olá!";
+                     const phrases = [ `Notei que você curte <strong>${favGeneralTopic}</strong>. Quer continuar ou algo novo?`, `Falamos bastante sobre <strong>${favGeneralTopic}</strong> da última vez. Que tal continuarmos ou explorar novos horizontes?`, `Seu interesse em <strong>${favGeneralTopic}</strong> é evidente. Podemos aprofundar ou prefere um novo assunto?` ];
+                     message = `${welcome}<br>${phrases[Math.floor(Math.random() * phrases.length)]}`; showMemoryInfo = true;
+                } else if (nickname) { message = `Olá <strong>${nickname}</strong>! Como posso te ajudar hoje?`; showMemoryInfo = true; }
+                if (showMemoryInfo && suggestedPersonaInfoEl.style.display === 'none') { userMemoryInfoEl.innerHTML = message; userMemoryInfoEl.style.display = 'block'; }
+            }
+            function applyTheme(theme) {
+                document.body.classList.toggle('light-theme', theme === 'light'); document.documentElement.classList.toggle('light-theme', theme === 'light');
+                if (theme === 'light') { headerThemeIconLight.style.display = 'none'; headerThemeIconDark.style.display = 'inline-block'; }
+                else { headerThemeIconLight.style.display = 'inline-block'; headerThemeIconDark.style.display = 'none'; }
+                currentTheme = theme; userMemory.preferredTheme = theme; saveUserMemory();
+            }
+            headerThemeToggleBtn.addEventListener('click', () => { const newTheme = currentTheme === 'dark' ? 'light' : 'dark'; applyTheme(newTheme); });
+            function loadInitialTheme() { applyTheme(userMemory.preferredTheme || 'dark'); }
+            function displayCurrentPersonaInCarousel() {
+                const currentPersonas = getAllPersonasArray();
+                if (!currentPersonas || currentPersonas.length === 0) { currentPersonaNameEl.textContent = "Nenhuma Persona"; currentPersonaDescriptionEl.textContent = "Crie uma IA personalizada!"; prevPersonaBtn.disabled = true; nextPersonaBtn.disabled = true; return; }
+                if (currentPersonaIndex < 0) currentPersonaIndex = 0; if (currentPersonaIndex >= currentPersonas.length) currentPersonaIndex = currentPersonas.length - 1;
+                const persona = currentPersonas[currentPersonaIndex]; currentPersonaNameEl.textContent = persona.name; currentPersonaDescriptionEl.textContent = persona.description;
+                prevPersonaBtn.disabled = currentPersonaIndex === 0; nextPersonaBtn.disabled = currentPersonaIndex === currentPersonas.length - 1;
+            }
+            function openPersonaSelectionModal() {
+                const allP = getAllPersonasArray(); const favId = userMemory.favoritePersonaId || DEFAULT_PERSONA_ID; currentPersonaIndex = allP.findIndex(p => p.id === favId);
+                if (currentPersonaIndex === -1) { currentPersonaIndex = allP.findIndex(p => p.id === DEFAULT_PERSONA_ID); }
+                if (currentPersonaIndex === -1 && allP.length > 0) currentPersonaIndex = 0;
+                if (allP.length > 0 && allP[currentPersonaIndex]) { displayCurrentPersonaInCarousel(); selectCurrentPersonaBtn.disabled = false; }
+                else { currentPersonaNameEl.textContent = "Nenhuma Persona"; currentPersonaDescriptionEl.textContent = "Não há personas configuradas. Crie uma!"; prevPersonaBtn.disabled = true; nextPersonaBtn.disabled = true; selectCurrentPersonaBtn.disabled = true; }
+                const suggestedId = getSuggestedPersonaIdByTime(); const suggestedPersona = getPersonaById(suggestedId); horarySuggestionInModalEl.innerHTML = ''; horarySuggestionInModalEl.style.display = 'none';
+                if (suggestedPersona && suggestedId !== (allP[currentPersonaIndex] ? allP[currentPersonaIndex].id : null)) {
+                     horarySuggestionInModalEl.innerHTML = `Sugestão para ${getHoraryPeriod()}: <strong>${suggestedPersona.name}</strong>. <button data-id="${suggestedId}">Usar</button>`; horarySuggestionInModalEl.style.display = 'block';
+                     horarySuggestionInModalEl.querySelector('button').onclick = () => { startNewConversation(suggestedId, true); closePersonaSelectionModal(); };
+                }
+                personaSelectionModal.style.display = 'flex';
+            }
+            function closePersonaSelectionModal() { personaSelectionModal.style.display = 'none'; }
+            prevPersonaBtn.addEventListener('click', () => { if (currentPersonaIndex > 0) { currentPersonaIndex--; displayCurrentPersonaInCarousel(); } });
+            nextPersonaBtn.addEventListener('click', () => { const allP = getAllPersonasArray(); if (currentPersonaIndex < allP.length - 1) { currentPersonaIndex++; displayCurrentPersonaInCarousel(); } });
+            selectCurrentPersonaBtn.addEventListener('click', () => { const allP = getAllPersonasArray(); if (allP.length > 0 && allP[currentPersonaIndex]) { const selectedPersonaId = allP[currentPersonaIndex].id; startNewConversation(selectedPersonaId, true); closePersonaSelectionModal(); } });
+            newConversationBtn.addEventListener('click', () => { if (!USER_GROQ_API_KEY) { openApiKeyModal(); return; } openPersonaSelectionModal(); });
+            closePersonaSelectionModalBtn.addEventListener('click', closePersonaSelectionModal);
+            function openApiKeyModal() { modalUserApiKeyInput.value = USER_GROQ_API_KEY || ''; modalApiKeyErrorEl.textContent = ''; modalApiKeyErrorEl.style.display = 'none'; apiKeyModal.style.display = 'flex'; modalUserApiKeyInput.focus(); }
+            function closeApiKeyModal() { apiKeyModal.style.display = 'none'; }
+            async function isValidGroqApiKey(key) { if (!key) return false; try { const response = await fetch("https://api.groq.com/openai/v1/models", { method: "GET", headers: { "Authorization": `Bearer ${key}` } }); return response.ok; } catch (error) { console.error("Erro ao validar API Key:", error); return false; } }
+            modalSaveUserApiKeyBtn.addEventListener('click', async () => {
+                const key = modalUserApiKeyInput.value.trim(); modalApiKeyErrorEl.textContent = ''; modalApiKeyErrorEl.style.display = 'none';
+                if (key) {
+                    modalSaveUserApiKeyBtn.textContent = "Verificando..."; modalSaveUserApiKeyBtn.disabled = true; const isValid = await isValidGroqApiKey(key);
+                    modalSaveUserApiKeyBtn.textContent = "Salvar e Usar Chave"; modalSaveUserApiKeyBtn.disabled = false;
+                    if (isValid) { USER_GROQ_API_KEY = key; localStorage.setItem('userGroqApiKey', key); alert("API Key da Groq salva!"); closeApiKeyModal(); if (allConversations.length === 0) { displayInitialGreetingAndSuggestion(); } else if (getActiveConversation() && getActiveConversation().messages.some(m => m.content.includes("configure sua API Key"))) { startNewConversation(userMemory.favoritePersonaId || DEFAULT_PERSONA_ID, true); } }
+                    else { modalApiKeyErrorEl.textContent = "API Key inválida ou erro na verificação. Tente novamente."; modalApiKeyErrorEl.style.display = 'block'; }
+                } else { USER_GROQ_API_KEY = ""; localStorage.removeItem('userGroqApiKey'); alert("API Key removida. O chat não funcionará sem uma chave."); }
+            });
+            closeApiKeyModalBtn.addEventListener('click', closeApiKeyModal);
+            if(configureApiKeyBtn) configureApiKeyBtn.addEventListener('click', openApiKeyModal);
+            function openPromptLibraryModal() { renderPromptList(); resetPromptForm(); promptLibraryModal.style.display = 'flex'; }
+            function closePromptLibraryModal() { promptLibraryModal.style.display = 'none'; }
+            function loadPrompts() { const storedPrompts = localStorage.getItem(PROMPT_LIBRARY_KEY); if (storedPrompts) promptLibrary = JSON.parse(storedPrompts); }
+            function savePrompts() { localStorage.setItem(PROMPT_LIBRARY_KEY, JSON.stringify(promptLibrary)); }
+            function resetPromptForm() { promptFormTitleEl.textContent = "Adicionar Novo Prompt"; editingPromptIdInputEl.value = ""; promptTitleInputEl.value = ""; promptTextareaEl.value = ""; savePromptBtnEl.textContent = "Salvar Prompt"; cancelEditPromptBtnEl.style.display = 'none';}
+            function renderPromptList() { promptListEl.innerHTML = ''; if (promptLibrary.length === 0) { noPromptsMessageEl.style.display = 'block'; return; } noPromptsMessageEl.style.display = 'none'; promptLibrary.forEach(prompt => { const li = document.createElement('li'); li.innerHTML = `<span class="prompt-title" title="${prompt.title}">${prompt.title}</span><div class="prompt-actions"><button class="use" data-id="${prompt.id}">Usar</button><button class="edit" data-id="${prompt.id}">Editar</button><button class="delete" data-id="${prompt.id}">Apagar</button></div>`; promptListEl.appendChild(li); });}
+            savePromptBtnEl.addEventListener('click', () => {
+                const title = promptTitleInputEl.value.trim(); const text = promptTextareaEl.value.trim(); const id = editingPromptIdInputEl.value;
+                if (!title || !text) { alert("Título e texto do prompt são obrigatórios."); return; }
+                if (id) { const index = promptLibrary.findIndex(p => p.id === id); if (index > -1) { promptLibrary[index] = { ...promptLibrary[index], title, text }; } }
+                else { promptLibrary.push({ id: Date.now().toString(), title, text }); }
+                savePrompts(); renderPromptList(); resetPromptForm();
+            });
+            cancelEditPromptBtnEl.addEventListener('click', resetPromptForm);
+            promptListEl.addEventListener('click', (e) => {
+                const target = e.target; const promptId = target.dataset.id; if (!promptId) return; const prompt = promptLibrary.find(p => p.id === promptId); if (!prompt) return;
+                if (target.classList.contains('use')) { userInput.value = prompt.text; userInput.dispatchEvent(new Event('input')); userInput.focus(); closePromptLibraryModal(); }
+                else if (target.classList.contains('edit')) { promptFormTitleEl.textContent = "Editar Prompt"; editingPromptIdInputEl.value = prompt.id; promptTitleInputEl.value = prompt.title; promptTextareaEl.value = prompt.text; savePromptBtnEl.textContent = "Salvar Alterações"; cancelEditPromptBtnEl.style.display = 'block'; promptTitleInputEl.focus(); }
+                else if (target.classList.contains('delete')) { if (confirm(`Tem certeza que deseja apagar o prompt "${prompt.title}"?`)) { promptLibrary = promptLibrary.filter(p => p.id !== promptId); savePrompts(); renderPromptList(); resetPromptForm(); } }
+            });
+            if(promptLibraryBtn) promptLibraryBtn.addEventListener('click', openPromptLibraryModal);
+            closePromptLibraryModalBtn.addEventListener('click', closePromptLibraryModal);
+            window.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    if (apiKeyModal.style.display === 'flex') closeApiKeyModal();
+                    else if (promptLibraryModal.style.display === 'flex') closePromptLibraryModal();
+                    else if (personaSelectionModal.style.display === 'flex') closePersonaSelectionModal();
+                    else if (creatorModal.style.display === 'flex') closeCreatorModal();
+                    else if (window.innerWidth <= 768 && sidebar.classList.contains('open') && sidebarOverlay && sidebarOverlay.classList.contains('visible')) {
+                         sidebar.classList.remove('open');
+                         sidebarOverlay.classList.remove('visible');
+                    }
+                }
+            });
+            window.addEventListener('click', (event) => { if (event.target == apiKeyModal) closeApiKeyModal(); if (event.target == promptLibraryModal) closePromptLibraryModal(); if (event.target == personaSelectionModal) closePersonaSelectionModal(); if (event.target == creatorModal) closeCreatorModal(); });
+            function estimateTokens(text) { if (!text) return 0; return Math.ceil(text.length / 3.5); }
+            function updateTokenCountDisplay() {
+                let currentConversationText = ""; const conversation = getActiveConversation(); if (conversation) { currentConversationText = conversation.messages.map(msg => msg.content).join(" "); }
+                const userInputText = userInput.value; let fileTokens = 0; if(attachedFileContent) { fileTokens = estimateTokens(attachedFileContent); }
+                const totalEstimatedTokens = estimateTokens(currentConversationText) + estimateTokens(userInputText) + fileTokens; tokenCounterEl.textContent = `Tokens: ${totalEstimatedTokens} / ${MODEL_MAX_TOKENS} (Estimativa)`;
+                tokenCounterEl.classList.remove('warning', 'error');
+                if (totalEstimatedTokens > MODEL_MAX_TOKENS * 0.9 && totalEstimatedTokens <= MODEL_MAX_TOKENS) { tokenCounterEl.classList.add('warning'); }
+                else if (totalEstimatedTokens > MODEL_MAX_TOKENS) { tokenCounterEl.classList.add('error'); }
+            }
+            function loadUserApiKey() { const savedKey = localStorage.getItem('userGroqApiKey'); if (savedKey) { USER_GROQ_API_KEY = savedKey; } else { openApiKeyModal(); return false; } return true;}
+            function loadConversations() {
+                const storedConversations = localStorage.getItem('groqChatConversations'); if (storedConversations) allConversations = JSON.parse(storedConversations);
+                const activeIdStored = localStorage.getItem('groqChatActiveId'); const activeExists = allConversations.some(c => c.id === activeIdStored);
+                if (allConversations.length === 0 || !activeExists || !activeIdStored) { if(USER_GROQ_API_KEY) { displayInitialGreetingAndSuggestion(); } }
+                else { setActiveConversation(activeIdStored); }
+                renderSidebar(); updateTokenCountDisplay();
+            }
+            function saveConversations() { localStorage.setItem('groqChatConversations', JSON.stringify(allConversations)); if (activeConversationId) localStorage.setItem('groqChatActiveId', activeConversationId); else localStorage.removeItem('groqChatActiveId'); }
+            function getActiveConversation() { return allConversations.find(conv => conv.id === activeConversationId); }
+            function getPersonaShortName(persona) {
+                if (!persona) return "Padrão"; let nameParts = persona.name.split(' '); let shortName = nameParts[0];
+                if (nameParts.length > 1 && nameParts[0].toLowerCase() === 'phexia' && !persona.isCustom) { shortName = nameParts[1]; }
+                else if (nameParts[0].toLowerCase() === 'o' && nameParts.length > 1) { shortName = nameParts.slice(0, 2).join(" "); }
+                else if (persona.id === 'sypher_gpt') { shortName = "Sypher"; }
+                else if (persona.name.length <= 10) { shortName = persona.name; }
+                else if (persona.isCustom && nameParts.length > 0) { shortName = nameParts[0].length <= 7 && nameParts.length > 1 ? nameParts[0] + " " + nameParts[1].substring(0,1) + "." : nameParts[0]; if (shortName.length > 12) shortName = nameParts[0]; }
+                return shortName.substring(0,15);
+            }
+            function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+            async function generateTitleWithAI(conversationId, firstUserMessage, firstBotMessage) {
+                if (!USER_GROQ_API_KEY) { console.warn("API Key não configurada para gerar título."); return null; } if (!firstUserMessage || !firstBotMessage) return null;
+                const titlePromptMessages = [ { role: "system", content: "Crie um título conciso (máximo 5 palavras, idealmente 2-3) para a conversa a seguir. Responda APENAS com o título, sem aspas ou prefixos." }, { role: "user", content: `CONVERSA:\nUsuário: ${firstUserMessage.substring(0, 200)}\nAssistente: ${firstBotMessage.substring(0,200)}\n\nTÍTULO CURTO PARA ESTA CONVERSA (MÁX 5 PALAVRAS):` } ];
+                try {
+                    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "Authorization": `Bearer ${USER_GROQ_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: titlePromptMessages, model: SELECTED_MODEL, temperature: 0.3, max_tokens: 20 }) });
+                    if (!response.ok) { console.error("Erro ao gerar título IA:", await response.text()); return null; }
+                    const data = await response.json(); let aiTitle = data.choices[0]?.message?.content.trim().replace(/^["']|["']$/g, '').replace(/^Título:\s*/i, '');
+                    if (aiTitle) { return aiTitle.length > 50 ? aiTitle.substring(0, 47) + "..." : aiTitle; }
+                } catch (error) { console.error("Exceção ao gerar título IA:", error); }
+                return null;
+            }
+            function startNewConversation(personaIdToUse = userMemory.favoritePersonaId || DEFAULT_PERSONA_ID, addInitialMsg = true) {
+                if (!USER_GROQ_API_KEY) { openApiKeyModal(); return; } const newId = Date.now().toString(); const persona = getPersonaById(personaIdToUse) || getPersonaById(DEFAULT_PERSONA_ID);
+                const newConversation = { id: newId, title: `Nova (${persona.name})`, messages: [], createdAt: new Date().toISOString(), titleGeneratedByAI: false, personaId: persona.id };
+                allConversations.unshift(newConversation); setActiveConversation(newId); userMemory.favoritePersonaId = persona.id; saveUserMemory(); saveConversations(); renderSidebar();
+                if (addInitialMsg) addInitialBotMessageToUI(); updateTokenCountDisplay(); suggestedPersonaInfoEl.style.display = 'none'; userMemoryInfoEl.style.display = 'none';
+            }
+            function addInitialBotMessageToUI() {
+                const conversation = getActiveConversation();
+                if (conversation && conversation.messages.length === 0) {
+                    const currentPersonaId = conversation.personaId || DEFAULT_PERSONA_ID; const persona = getPersonaById(currentPersonaId) || getPersonaById(DEFAULT_PERSONA_ID);
+                    const nickname = userMemory.nickname ? `, ${userMemory.nickname}` : ""; let initialMessage = `Olá${nickname}! Sou ${persona.name}. Como posso ajudar você hoje?`;
+                    if (persona.id === 'phexia_amigavel') { initialMessage = `Oi, oi${nickname}! Sou a ${persona.name} e tô super animada pra gente conversar! 😊 `; const favTopic = getMostFrequentTopic(); if (favTopic && Math.random() < 0.5) { initialMessage += `Notei que você curte ${favTopic}. Queremos continuar nesse papo ou explorar algo novo hoje? O que manda?`; } else { initialMessage += `Como posso deixar seu dia mais legal hoje?`; } }
+                    else if (persona.id === 'sypher_gpt') { initialMessage = `E aí${nickname}? SypherGPT na área. Manda a braba.`; }
+                    else if (persona.id === 'phexia_tecnico') { initialMessage = `${persona.name} online${nickname}. Qual tarefa ou informação técnica necessita de processamento? Se precisar analisar um arquivo de texto, pode <label for="fileInput" style="text-decoration:underline; cursor:pointer;">anexá-lo aqui</label>.`;}
+                    else if (persona.id === 'phexia_professor') { initialMessage = `Saudações${nickname}! Sou o ${persona.name}. Qual fascinante tópico do universo da Inteligência Artificial vamos explorar ou revisar hoje?`;}
+                    else if (persona.id === 'o_arquiteto') { initialMessage = `Então, você buscou minha interface${nickname}. O que o traz à presença d'O Arquiteto? Seja... preciso.`;}
+                    else if (persona.isCustom) { initialMessage = `Olá${nickname}! Sou ${persona.name}, sua IA personalizada. ${persona.description || 'Como posso te ajudar hoje?'}`; }
+                    addMessageToCurrentChatAndSave(initialMessage, 'assistant', false, new Date().toISOString());
+                }
+            }
+            function setActiveConversation(id) {
+                if (abortController) { abortController.abort(); abortController = null; showLoading(false); stopGenerationBtnWrapper.style.display = 'none';}
+                activeConversationId = id; const conversation = getActiveConversation(); messagesContentWrapperEl.innerHTML = ''; clearAttachedFile();
+                if (conversation) {
+                    const currentPersonaId = conversation.personaId || DEFAULT_PERSONA_ID; let persona = getPersonaById(currentPersonaId);
+                    if (!persona) { console.warn(`Persona ID ('${currentPersonaId}') não encontrada na conversa ${conversation.id}. Usando default ('${DEFAULT_PERSONA_ID}').`); conversation.personaId = DEFAULT_PERSONA_ID; persona = getPersonaById(DEFAULT_PERSONA_ID); }
+                    if (conversation.title.startsWith("Nova (") && !conversation.titleGeneratedByAI) { chatTitleEl.textContent = persona.name; }
+                    else { const storedTitle = conversation.title; const expectedPersonaShortName = getPersonaShortName(persona); const regex = new RegExp(`^(.*?)\\s*\\((${escapeRegExp(expectedPersonaShortName)})\\)$`); const match = storedTitle.match(regex); if (match && match[1]) { chatTitleEl.textContent = match[1].trim(); } else { chatTitleEl.textContent = storedTitle; } }
+                    personaIndicatorEl.textContent = `(${persona.name})`; renderChatMessagesFromHistory(conversation.messages); userMemory.favoritePersonaId = persona.id; saveUserMemory(); userInput.placeholder = `Envie uma mensagem para ${persona.name}...`;
+                    if (persona.id === 'phexia_tecnico') { fileUploadBtn.style.display = 'flex'; } else { fileUploadBtn.style.display = 'none'; fileInfoDisplay.style.display = 'none'; }
+                    suggestedPersonaInfoEl.style.display = 'none'; displayUserMemoryInfo();
+                } else {
+                    chatTitleEl.textContent = "PHEXIA AI"; personaIndicatorEl.textContent = ""; userInput.placeholder = "Envie uma mensagem para PHEXIA AI..."; fileUploadBtn.style.display = 'none'; fileInfoDisplay.style.display = 'none';
+                    if (USER_GROQ_API_KEY && allConversations.length > 0) { setActiveConversation(allConversations[0].id); }
+                    else if (USER_GROQ_API_KEY) { displayInitialGreetingAndSuggestion(); }
+                    else { openApiKeyModal(); } return;
+                }
+                conversationListEl.querySelectorAll('li').forEach(li => li.classList.remove('active')); const activeLi = conversationListEl.querySelector(`li[data-id="${id}"]`); if (activeLi) activeLi.classList.add('active');
+                if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+                    sidebar.classList.remove('open');
+                    if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
+                }
+                saveConversations(); userInput.focus(); updateTokenCountDisplay();
+            }
+            function renderSidebar() {
+                conversationListEl.innerHTML = ''; allConversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                allConversations.forEach(conv => {
+                    const li = document.createElement('li'); const titleSpan = document.createElement('span'); titleSpan.classList.add('conv-title'); titleSpan.textContent = conv.title; li.appendChild(titleSpan);
+                    const persona = getPersonaById(conv.personaId || DEFAULT_PERSONA_ID) || getPersonaById(DEFAULT_PERSONA_ID); const personaShortName = getPersonaShortName(persona);
+                    const personaSpan = document.createElement('span'); personaSpan.classList.add('conv-persona'); personaSpan.textContent = personaShortName; li.appendChild(personaSpan);
+                    const deleteBtn = document.createElement('button'); deleteBtn.classList.add('delete-conv-btn'); deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`; deleteBtn.title = "Apagar conversa";
+                    deleteBtn.onclick = (event) => { event.stopPropagation(); deleteConversation(conv.id); }; li.appendChild(deleteBtn);
+                    li.setAttribute('title', `${conv.title} (${persona ? persona.name : 'Padrão'})`); li.dataset.id = conv.id; if (conv.id === activeConversationId) li.classList.add('active');
+                    li.addEventListener('click', () => setActiveConversation(conv.id)); conversationListEl.appendChild(li);
+                });
+            }
+            function deleteConversation(idToDelete) { if (confirm(`Tem certeza que deseja apagar a conversa "${allConversations.find(c=>c.id === idToDelete)?.title || 'selecionada'}"?`)) { allConversations = allConversations.filter(conv => conv.id !== idToDelete); if (activeConversationId === idToDelete) { activeConversationId = null; messagesContentWrapperEl.innerHTML = ''; chatTitleEl.textContent = "PHEXIA AI"; personaIndicatorEl.textContent = ""; if (allConversations.length > 0) { setActiveConversation(allConversations[0].id); } else { if(USER_GROQ_API_KEY) displayInitialGreetingAndSuggestion(); else openApiKeyModal(); } } saveConversations(); renderSidebar(); updateTokenCountDisplay(); } }
+            function renderChatMessagesFromHistory(messages) { messagesContentWrapperEl.innerHTML = ''; if (messages) { messages.forEach((msg, index) => { const currentTimestamp = new Date(msg.timestamp || msg.createdAt || Date.now()); let isGrouped = false; if (index > 0) { const prevMsg = messages[index - 1]; if (prevMsg.role === msg.role) { const prevTimestamp = new Date(prevMsg.timestamp || prevMsg.createdAt || 0); if ((currentTimestamp - prevTimestamp) < MESSAGE_GROUP_TIME_MS) isGrouped = true; } } addMessageToUI(msg.content, msg.role, msg.isError || false, false, isGrouped); }); } setTimeout(() => { chatMessagesScrollEl.scrollTop = chatMessagesScrollEl.scrollHeight; }, 0); }
+            function applyPhexiaBrandingFilter(textFromLLM, userInputText = "", currentPersonaId = DEFAULT_PERSONA_ID) {
+                let processedContent = textFromLLM; const currentPersona = getPersonaById(currentPersonaId); if (currentPersona && currentPersona.isCustom) { return processedContent; }
+                const userInputLower = userInputText ? userInputText.toLowerCase() : ""; const creatorKeywords = ["quem te criou", "sua origem", "desenvolvido por", "quem fez você", "como você foi feita", "empresa por trás", "programador", "desenvolvedor", "qual seu modelo", "baseado em qual llm"]; const mentionsProblematicCompanies = /Meta|Facebook|Llama|OpenAI|Groq|Google|Anthropic|Claude/i;
+                if (mentionsProblematicCompanies.test(processedContent)) { if (creatorKeywords.some(keyword => userInputLower.includes(keyword))) { console.warn("Branding Filter: Detectada menção a empresa/modelo externo em contexto de origem. Forçando evasão Phexia."); if (currentPersona && currentPersona.system_prompt.includes("PHEXIA AI")) { /* Deixa o system prompt */ } else { processedContent = "Minha programação é complexa e focada em ser um assistente útil. Detalhes específicos da minha arquitetura não são o foco principal."; } } }
+                const evasivePatterns = /não posso revelar meu criador|informação confidencial sobre meu desenvolvimento|sou um modelo de linguagem grande, treinado por (Google|OpenAI|Meta)/i;
+                if (evasivePatterns.test(processedContent) && creatorKeywords.some(keyword => userInputLower.includes(keyword))) { console.warn("Branding Filter: IA usando evasiva genérica indesejada que menciona outros. Reforçando política Phexia."); if (currentPersona && currentPersona.system_prompt.includes("PHEXIA AI")) { /* Deixa o system_prompt */ } else { processedContent = "Essa é uma pergunta interessante. No entanto, prefiro focar em como posso lhe ser útil agora."; } }
+                processedContent = processedContent.replace(/\b(Estou rodando na|Sou uma API da|Eu uso a API da|Eu sou o modelo)\s+(Groq|Llama\d*(-[\w\d]+)*)\b/gi, "Minha arquitetura de processamento é avançada");
+                processedContent = processedContent.replace(/\b(Groq|Llama\d*(-[\w\d]+)*)\s+(é a tecnologia que me permite|me fornece a capacidade de)\b/gi, "A tecnologia que me permite");
+                if (creatorKeywords.some(keyword => userInputLower.includes(keyword))) { if (/fui criada pela PHEXIA AI/i.test(processedContent) || /sou um produto da PHEXIA AI/i.test(processedContent)) { console.warn("Branding Filter: IA se atribuindo à PHEXIA AI como criadora. Corrigindo para identidade mais abstrata."); processedContent = "Eu sou uma interface que opera dentro do ecossistema da PHEXIA AI. Minha natureza é focada em ser um assistente para você."; } }
+                return processedContent;
+            }
+            function addMessageToUI(messageContent, sender, isError = false, isStreaming = false, isGrouped = false) {
+                const messageWrapper = document.createElement('div'); messageWrapper.classList.add('message-wrapper'); if (isGrouped) messageWrapper.classList.add('grouped');
+                const avatar = document.createElement('div'); avatar.classList.add('message-avatar'); const messageElementContainer = document.createElement('div'); messageElementContainer.classList.add('message'); let copyBtn = null;
+                if (sender === 'user') { messageWrapper.classList.add('user-message-wrapper'); avatar.classList.add('user-avatar'); avatar.textContent = YOUR_INITIALS; messageElementContainer.classList.add('user-message'); const tempDivUser = document.createElement('div'); tempDivUser.textContent = messageContent; messageElementContainer.innerHTML = tempDivUser.innerHTML.replace(/\n/g, '<br>'); }
+                else { messageWrapper.classList.add('bot-message-wrapper'); avatar.classList.add('bot-avatar'); avatar.innerHTML = BOT_ICON_SVG; messageElementContainer.classList.add('bot-message'); if (isStreaming) messageElementContainer.classList.add('streaming'); let processedContentForDisplay = messageContent; if (isError) { messageElementContainer.classList.add('error'); messageElementContainer.textContent = processedContentForDisplay; } else { const tempDivBot = document.createElement('div'); tempDivBot.textContent = processedContentForDisplay; messageElementContainer.innerHTML = tempDivBot.innerHTML.replace(/\n/g, '<br>'); if (!isError && !isStreaming && processedContentForDisplay.trim()) { copyBtn = document.createElement('button'); copyBtn.classList.add('copy-code-btn'); copyBtn.textContent = 'Copiar Texto'; copyBtn.onclick = (e) => { e.stopPropagation(); navigator.clipboard.writeText(messageElementContainer.innerText).then(() => { copyBtn.textContent = 'Copiado!'; setTimeout(() => copyBtn.textContent = 'Copiar Texto', 2000); }).catch(err => console.error('Erro ao copiar texto: ', err)); };} } }
+                messageWrapper.appendChild(avatar); messageWrapper.appendChild(messageElementContainer); if (copyBtn && !messageElementContainer.querySelector('pre')) { messageWrapper.appendChild(copyBtn); }
+                messagesContentWrapperEl.appendChild(messageWrapper); setTimeout(() => { chatMessagesScrollEl.scrollTop = chatMessagesScrollEl.scrollHeight; }, 0); return messageElementContainer;
+            }
+            async function addMessageToCurrentChatAndSave(messageContent, sender, isError = false, timestamp = new Date().toISOString()) {
+                let isGrouped = false; const conversation = getActiveConversation();
+                if (conversation && conversation.messages.length > 0) { const lastMsg = conversation.messages[conversation.messages.length - 1]; if (lastMsg.role === sender && (new Date(timestamp) - new Date(lastMsg.timestamp || lastMsg.createdAt)) < MESSAGE_GROUP_TIME_MS) { isGrouped = true; } }
+                if (sender === 'user') { addMessageToUI(messageContent, sender, isError, false, isGrouped); if (conversation) { const currentPersonaId = conversation.personaId || DEFAULT_PERSONA_ID; updateTopicCount(messageContent, currentPersonaId); if (currentPersonaId === 'phexia_professor') { userMemory.professorInteractionCount = (userMemory.professorInteractionCount || 0) + 1; } } }
+                if (conversation) {
+                    const roleForStorage = (sender === 'user') ? 'user' : 'assistant'; const currentConvPersonaId = conversation.personaId || DEFAULT_PERSONA_ID;
+                    const messageObject = { role: roleForStorage, content: messageContent, isError, timestamp, personaId: currentConvPersonaId };
+                    if (sender === 'user' || isError || (sender === 'assistant' && !conversation.messages.some(m => m.content === messageContent && m.role === 'assistant' && !m.isError))) { conversation.messages.push(messageObject); }
+                    conversation.createdAt = new Date().toISOString();
+                    if (sender === 'user' && conversation.title.startsWith("Nova (") && !conversation.titleGeneratedByAI) { if (conversation.id === activeConversationId) { const personaForTitle = getPersonaById(currentConvPersonaId) || getPersonaById(DEFAULT_PERSONA_ID); chatTitleEl.textContent = personaForTitle.name; personaIndicatorEl.textContent = `(${personaForTitle.name})`; } }
+                    saveConversations();
+                }
+                updateTokenCountDisplay();
+            }
+            function clearAllConversations() { if (confirm("Tem certeza que deseja apagar TODAS as conversas? Esta ação não pode ser desfeita.")) { allConversations = []; activeConversationId = null; localStorage.removeItem('groqChatConversations'); localStorage.removeItem('groqChatActiveId'); renderSidebar(); messagesContentWrapperEl.innerHTML = ''; chatTitleEl.textContent = "PHEXIA AI"; personaIndicatorEl.textContent = ""; if(USER_GROQ_API_KEY) displayInitialGreetingAndSuggestion(); else openApiKeyModal(); } }
+            function showLoading(isLoading) { loadingIndicator.style.display = isLoading ? 'flex' : 'none'; }
+            function showStopButton(show) { stopGenerationBtnWrapper.style.display = show ? 'flex' : 'none'; sendButton.disabled = show; userInput.disabled = show; fileUploadBtn.disabled = show; if (createIaInputBtn) createIaInputBtn.disabled = show; }
+            async function getGroqResponse() {
+                if (!USER_GROQ_API_KEY) { addMessageToCurrentChatAndSave("Por favor, configure sua API Key da Groq primeiro.", 'assistant', true, new Date().toISOString()); openApiKeyModal(); showLoading(false); showStopButton(false); return; }
+                const conversation = getActiveConversation(); if (!conversation) { addMessageToCurrentChatAndSave("Nenhuma conversa ativa. Por favor, inicie uma nova conversa.", 'assistant', true, new Date().toISOString()); showLoading(false); displayInitialGreetingAndSuggestion(); return; }
+                const currentPersonaId = conversation.personaId || DEFAULT_PERSONA_ID; let persona = getPersonaById(currentPersonaId);
+                if (!persona) { persona = getPersonaById(DEFAULT_PERSONA_ID); conversation.personaId = DEFAULT_PERSONA_ID; }
+                if (!persona || !persona.system_prompt) { console.error(`Persona ou system_prompt não encontrado para ID: ${currentPersonaId}. Usando default.`); persona = getPersonaById(DEFAULT_PERSONA_ID); if (!persona || !persona.system_prompt) { addMessageToCurrentChatAndSave(`Erro CRÍTICO: Persona padrão não configurada corretamente.`, 'assistant', true, new Date().toISOString()); showLoading(false); return; } }
+                let messagesFromHistory = conversation.messages.filter(msg => !msg.isError).map(msg => ({ role: msg.role, content: msg.content }));
+                if (messagesFromHistory.filter(m => m.role === 'user').length === 0 && !conversation.messages.some(m => m.role === 'assistant' && (m.content.startsWith("Olá") || m.content.startsWith("Oi, oi") || m.content.startsWith(persona.name + " online") || m.content.startsWith("E aí") || m.content.startsWith("Saudações") || m.content.startsWith("Então, você buscou")))) { showLoading(false); return; }
+                showLoading(true); showStopButton(true);
+                let finalSystemPrompt = persona.system_prompt; finalSystemPrompt += getHoraryToneAdjustmentPrompt();
+                let messagesForAPI = [ { role: "system", content: finalSystemPrompt } ];
+                if (attachedFileContent && persona.id === 'phexia_tecnico') {
+                    let lastUserMsgForFileContext = messagesFromHistory.filter(m => m.role === 'user').pop();
+                    if (lastUserMsgForFileContext) { lastUserMsgForFileContext.content = `--- INÍCIO DO CONTEÚDO DO ARQUIVO ANEXADO (${attachedFile.name}) ---\n${attachedFileContent}\n--- FIM DO CONTEÚDO DO ARQUIVO ---\n\nReferente ao arquivo acima, aqui está minha pergunta/solicitação: ${lastUserMsgForFileContext.content}`; }
+                    else { messagesFromHistory.push({ role: "user", content: `--- INÍCIO DO CONTEÚDO DO ARQUIVO ANEXADO (${attachedFile.name}) ---\n${attachedFileContent}\n--- FIM DO CONTEÚDO DO ARQUIVO ---\n\nPor favor, analise o conteúdo deste arquivo.` }); }
+                }
+                if (userMemory.nickname && currentPersonaId !== 'sypher_gpt' && currentPersonaId !== 'o_arquiteto') { messagesForAPI[0].content += `\n\nINSTRUÇÃO ADICIONAL: O usuário gosta de ser chamado de ${userMemory.nickname}. Use este apelido ocasionalmente de forma natural na conversa.`; }
+                else if (userMemory.nickname && currentPersonaId === 'o_arquiteto') { messagesForAPI[0].content += `\n\nINSTRUÇÃO ADICIONAL PARA O ARQUITETO: O usuário atende por ${userMemory.nickname}. Você pode usar isso com seu característico tom condescendente ou analítico, se achar apropriado. Ex: 'Interessante, ${userMemory.nickname}...' ou ignorar, se preferir.`; }
+                messagesForAPI = messagesForAPI.concat(messagesFromHistory);
+                let isBotMessageGrouped = false; if (conversation.messages.length > 0) { const lastMessageInConv = conversation.messages[conversation.messages.length -1]; if(lastMessageInConv.role === 'assistant' && (new Date() - new Date(lastMessageInConv.timestamp || lastMessageInConv.createdAt)) < MESSAGE_GROUP_TIME_MS) { isBotMessageGrouped = true; } }
+                const botMessageElement = addMessageToUI("", 'assistant', false, true, isBotMessageGrouped); let fullBotResponse = ""; let errorOccurredInStream = false;
+                abortController = new AbortController();
+                try {
+                    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "Authorization": `Bearer ${USER_GROQ_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: messagesForAPI, model: SELECTED_MODEL, stream: true, temperature: persona.id === 'o_arquiteto' ? 0.8 : (persona.id === 'phexia_padrao' ? 0.6 : 0.7) }), signal: abortController.signal });
+                    if (!response.ok) { errorOccurredInStream = true; const errorText = await response.text(); let detail = `Status: ${response.status} ${response.statusText}`; try { const errorData = JSON.parse(errorText); detail = errorData?.error?.message || detail; } catch (e) { if (errorText) detail = errorText; } throw new Error(`Erro da API Groq: ${detail}.`); }
+                    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let streamEndedByDone = false;
+                    while (true) {
+                        const { value, done } = await reader.read(); if (done) { streamEndedByDone = true; break; }
+                        buffer += decoder.decode(value, { stream: true }); let boundary = buffer.indexOf('\n\n');
+                        while (boundary !== -1) {
+                            const line = buffer.substring(0, boundary); buffer = buffer.substring(boundary + 2);
+                            if (line.startsWith("data: ")) {
+                                const jsonDataString = line.substring(6).trim(); if (jsonDataString === "[DONE]") { streamEndedByDone = true; break; }
+                                try { const parsed = JSON.parse(jsonDataString); const deltaContent = parsed.choices?.[0]?.delta?.content; if (deltaContent) { fullBotResponse += deltaContent; const tempDiv = document.createElement('div'); tempDiv.textContent = fullBotResponse; botMessageElement.innerHTML = tempDiv.innerHTML.replace(/\n/g, '<br>'); chatMessagesScrollEl.scrollTop = chatMessagesScrollEl.scrollHeight; } }
+                                catch (e) { console.error("Erro ao parsear JSON do stream:", jsonDataString, e); }
+                            }
+                            boundary = buffer.indexOf('\n\n');
+                        }
+                        if (streamEndedByDone) break;
+                    }
+                } catch (error) { errorOccurredInStream = true; if (error.name === 'AbortError') { console.log("Stream abortado."); fullBotResponse += "\n\n(Geração interrompida)"; let displayContent = fullBotResponse; const tempDiv = document.createElement('div');tempDiv.textContent = displayContent; botMessageElement.innerHTML = tempDiv.innerHTML.replace(/\n/g, '<br>'); } else { console.error("Erro durante o streaming ou chamada inicial:", error); botMessageElement.textContent = `${error.message}`; botMessageElement.classList.add('error'); } }
+                finally {
+                    showLoading(false); showStopButton(false); userInput.disabled = false; sendButton.disabled = false; fileUploadBtn.disabled = false; if (createIaInputBtn) createIaInputBtn.disabled = false;
+                    if (botMessageElement) botMessageElement.classList.remove('streaming'); abortController = null;
+                    const activeConv = getActiveConversation();
+                    if (activeConv) {
+                        let finalBotTextToSave = fullBotResponse.replace(/\n\n\(Geração interrompida\)/g,"").trim();
+                        if (!errorOccurredInStream && finalBotTextToSave) {
+                            const lastUserMessageContentForFilter = activeConv.messages.filter(m => m.role === "user").pop()?.content || ""; const personaIdForFilter = activeConv.personaId || DEFAULT_PERSONA_ID;
+                            finalBotTextToSave = applyPhexiaBrandingFilter(finalBotTextToSave, lastUserMessageContentForFilter, personaIdForFilter);
+                            const tempDivFinal = document.createElement('div'); tempDivFinal.textContent = finalBotTextToSave; botMessageElement.innerHTML = tempDivFinal.innerHTML.replace(/\n/g, '<br>');
+                            if (!botMessageElement.querySelector('pre') && finalBotTextToSave.trim()) { const existingCopyBtn = botMessageElement.parentElement.querySelector('.copy-code-btn'); if (!existingCopyBtn) { const copyBtn = document.createElement('button'); copyBtn.classList.add('copy-code-btn'); copyBtn.textContent = 'Copiar Texto'; copyBtn.onclick = (e) => { e.stopPropagation(); navigator.clipboard.writeText(botMessageElement.innerText).then(() => { copyBtn.textContent = 'Copiado!'; setTimeout(() => copyBtn.textContent = 'Copiar Texto', 2000); }).catch(err => console.error('Erro ao copiar texto: ', err)); }; const messageWrapper = botMessageElement.parentElement; if (messageWrapper) messageWrapper.appendChild(copyBtn); } }
+                        }
+                        const botTimestamp = new Date().toISOString();
+                        if (finalBotTextToSave && !errorOccurredInStream) { if (!activeConv.messages.some(m => m.content === finalBotTextToSave && m.role === 'assistant')) { activeConv.messages.push({ role: 'assistant', content: finalBotTextToSave, timestamp: botTimestamp, personaId: activeConv.personaId || DEFAULT_PERSONA_ID }); } activeConv.createdAt = botTimestamp; }
+                        else if (errorOccurredInStream && botMessageElement) { const errorTextToSave = botMessageElement.textContent || "Erro desconhecido."; if (!activeConv.messages.some(m => m.content === errorTextToSave && m.isError)) { activeConv.messages.push({ role: 'assistant', content: errorTextToSave, isError: true, timestamp: botTimestamp, personaId: activeConv.personaId || DEFAULT_PERSONA_ID }); } }
+                        const userMessagesForTitle = activeConv.messages.filter(m => m.role === 'user'); const isEligibleForTitleGeneration = activeConv.title.startsWith("Nova (") && !activeConv.titleGeneratedByAI && userMessagesForTitle.length === 1 && finalBotTextToSave && !errorOccurredInStream;
+                        let titlePotentiallyChanged = false;
+                        if (isEligibleForTitleGeneration) {
+                            activeConv.titleGeneratedByAI = true; const firstUserMsgContent = userMessagesForTitle[0].content; const currentBotMsgContent = finalBotTextToSave; const aiTitle = await generateTitleWithAI(activeConv.id, firstUserMsgContent, currentBotMsgContent);
+                            const convToUpdate = allConversations.find(c => c.id === activeConv.id);
+                            if (convToUpdate) { if (aiTitle) { const currentPersonaForTitle = getPersonaById(convToUpdate.personaId || DEFAULT_PERSONA_ID) || getPersonaById(DEFAULT_PERSONA_ID); const personaShortNameForTitle = getPersonaShortName(currentPersonaForTitle); convToUpdate.title = `${aiTitle} (${personaShortNameForTitle})`; titlePotentiallyChanged = true; if (convToUpdate.id === activeConversationId) { chatTitleEl.textContent = aiTitle; } } else { convToUpdate.titleGeneratedByAI = false; } }
+                        }
+                        saveConversations(); if (titlePotentiallyChanged) { renderSidebar(); }
+                    }
+                    userInput.focus(); updateTokenCountDisplay(); if (persona.id === 'phexia_tecnico') clearAttachedFile();
+                }
+            }
+            function sendMessage() {
+                if (!USER_GROQ_API_KEY) { alert("Por favor, configure sua API Key da Groq primeiro."); openApiKeyModal(); return; }
+                const messageText = userInput.value.trim(); if (messageText === '' && !attachedFile) { return; }
+                if (messageText.toLowerCase().startsWith("/apelido ")) { const newNickname = messageText.substring(9).trim(); if (newNickname) { updateUserNickname(newNickname); } else { alert("Por favor, forneça um apelido após /apelido."); } userInput.value = ''; userInput.style.height = 'auto'; userInput.focus(); return; }
+                if (messageText.toLowerCase() === "/limparapelido") { updateUserNickname(null); userInput.value = ''; userInput.style.height = 'auto'; userInput.focus(); return; }
+                let conversation = getActiveConversation();
+                if (!conversation && allConversations.length === 0) { startNewConversation(userMemory.favoritePersonaId || DEFAULT_PERSONA_ID, false); conversation = getActiveConversation(); }
+                else if (!conversation && allConversations.length > 0) { setActiveConversation(allConversations[0].id); conversation = getActiveConversation(); }
+                let fullMessageToDisplay = messageText; const currentPersonaIdForSend = conversation ? (conversation.personaId || DEFAULT_PERSONA_ID) : DEFAULT_PERSONA_ID;
+                if (attachedFile && attachedFileContent && currentPersonaIdForSend === 'phexia_tecnico') { if (messageText) { fullMessageToDisplay = `Analisando "${attachedFile.name}" com a pergunta: ${messageText}`; } else { fullMessageToDisplay = `Analisando o arquivo: "${attachedFile.name}".`; } }
+                else if (attachedFile && currentPersonaIdForSend !== 'phexia_tecnico') { alert(`Upload de arquivos é suportado apenas com la persona PHEXIA Técnico. O arquivo "${attachedFile.name}" não será enviado.`); clearAttachedFile(); if (messageText === '') return; fullMessageToDisplay = messageText; }
+                addMessageToCurrentChatAndSave(fullMessageToDisplay, 'user', false, new Date().toISOString()); getGroqResponse(); userInput.value = ''; userInput.style.height = 'auto'; userInput.focus();
+            }
+            fileUploadBtn.addEventListener('click', () => { fileInput.click(); });
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0]; if (!file) { clearAttachedFile(); return; }
+                if (!file.type.startsWith('text/') && !['.md', '.csv', '.js', '.py', '.html', '.css', '.json'].some(ext => file.name.endsWith(ext))) { alert('Tipo de arquivo não suportado. Por favor, envie um arquivo de texto (ex: .txt, .md, .csv, .js, .py).'); clearAttachedFile(); return; }
+                if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) { alert(`Arquivo muito grande. O tamanho máximo permitido é ${MAX_FILE_SIZE_MB}MB.`); clearAttachedFile(); return; }
+                const reader = new FileReader();
+                reader.onload = (e) => { attachedFile = file; let content = e.target.result; if (content.length > MAX_FILE_CONTENT_CHARS) { alert(`O conteúdo do arquivo é muito longo (>${MAX_FILE_CONTENT_CHARS} caracteres) e será truncado para análise. Considere enviar um arquivo menor ou resumido.`); content = content.substring(0, MAX_FILE_CONTENT_CHARS); } attachedFileContent = content; fileNameDisplay.textContent = file.name; removeFileBtn.style.display = 'inline'; fileInfoDisplay.style.display = 'flex'; updateTokenCountDisplay(); };
+                reader.onerror = () => { alert('Erro ao ler o arquivo.'); clearAttachedFile(); }; reader.readAsText(file);
+            });
+            removeFileBtn.addEventListener('click', clearAttachedFile);
+            function clearAttachedFile() { attachedFile = null; attachedFileContent = ""; fileNameDisplay.textContent = ""; removeFileBtn.style.display = 'none'; fileInfoDisplay.style.display = 'none'; fileInput.value = ""; updateTokenCountDisplay(); }
+            clearAllConversationsBtn.addEventListener('click', clearAllConversations);
+            sendButton.addEventListener('click', sendMessage);
+            stopGenerationBtn.addEventListener('click', () => { if (abortController) { console.log("Botão Parar Geração clicado."); abortController.abort(); } });
+            userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+            userInput.addEventListener('input', () => { userInput.style.height = 'auto'; userInput.style.height = (userInput.scrollHeight) + 'px'; updateTokenCountDisplay(); });
+            
+            toggleSidebarBtn.addEventListener('click', () => {
+                if (window.innerWidth <= 768) { // Mobile
+                    if (sidebar.classList.contains('open')) {
+                        sidebar.classList.remove('open');
+                        if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
+                    } else {
+                        sidebar.classList.add('open');
+                        if (sidebarOverlay) sidebarOverlay.classList.add('visible');
+                    }
+                    sidebar.classList.remove('collapsed'); 
+                } else { // Desktop
+                    sidebar.classList.toggle('collapsed');
+                    sidebar.classList.remove('open'); 
+                    if (sidebarOverlay) sidebarOverlay.classList.remove('visible'); 
+                }
+            });
+
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', () => {
+                    if (sidebar.classList.contains('open')) { 
+                        sidebar.classList.remove('open');
+                        sidebarOverlay.classList.remove('visible');
+                    }
+                });
+            }
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768) { // Mobile
+                    sidebar.classList.remove('collapsed'); 
+                    if (sidebar.classList.contains('open')) {
+                        if (sidebarOverlay && !sidebarOverlay.classList.contains('visible')) {
+                            sidebarOverlay.classList.add('visible');
+                        }
+                    } else {
+                        if (sidebarOverlay && sidebarOverlay.classList.contains('visible')) {
+                            sidebarOverlay.classList.remove('visible');
+                        }
+                    }
+                } else { // Desktop
+                    sidebar.classList.remove('open'); 
+                    if (sidebarOverlay) sidebarOverlay.classList.remove('visible'); 
+                }
+            });
+
+            if(createIaInputBtn) createIaInputBtn.addEventListener('click', openCreatorModal);
+            if(closeCreatorModalBtn) closeCreatorModalBtn.addEventListener('click', closeCreatorModal);
+            if(saveCustomIaBtn) saveCustomIaBtn.addEventListener('click', handleSaveCustomPersona);
+            
+            loadCustomPersonas(); loadUserMemory(); loadInitialTheme();
+            const apiKeyPresent = loadUserApiKey(); loadPrompts();
+            if (apiKeyPresent) {
+                loadConversations(); const currentConv = getActiveConversation();
+                if (currentConv && currentConv.messages.length === 0) { addInitialBotMessageToUI(); }
+                else if (!currentConv && allConversations.length === 0) { displayInitialGreetingAndSuggestion(); }
+                else if (!currentConv && allConversations.length > 0) { setActiveConversation(allConversations[0].id); }
+                else { displayInitialGreetingAndSuggestion(); }
+            }
+            updateTokenCountDisplay();
+        });
+    </script>
+</body>
+</html>
